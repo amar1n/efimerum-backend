@@ -1,4 +1,4 @@
-1) Almacenar la geolocalización de la foto (https://firebase.googleblog.com/2014/06/geofire-20.html)
+1.) Almacenar la geolocalización de la foto (https://firebase.googleblog.com/2014/06/geofire-20.html)
 
 2) Almacenar el país y ciudad de la foto subida, averiguándolo de la IP
 
