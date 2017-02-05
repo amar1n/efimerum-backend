@@ -101,7 +101,7 @@ router.delete('/', function (req, res) {
                     });
                 })
                 .catch(function (err) {
-                    return res.status(500).json({success: false, error: error});
+                    return res.status(500).json({success: false, error: err});
                 });
         })
         .catch(function (error) {
