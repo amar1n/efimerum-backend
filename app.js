@@ -23,6 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', require('./routes/index'));
 app.use('/api/v1/photos', require('./routes/api/v1/photos'));
+app.use('/api/v1/labels', require('./routes/api/v1/labels'));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

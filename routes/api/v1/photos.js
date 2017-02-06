@@ -25,10 +25,8 @@ router.get('/', function (req, res) {
     var photosRef = rootRef.child('photos');
     photosRef.once('value')
         .then(function (snap) {
-
             var snapShuffled = shuffleFirebaseSnapshot(snap);
-
-            return res.status(200).json({success: true, data: snapShuffled });
+            return res.status(200).json({success: true, data: snapShuffled});
         })
         .catch(function (error) {
             return res.status(500).json({success: false, error: error});
@@ -39,38 +37,57 @@ router.post('/', multer.any(), function (req, res) {
     const fotosBucket = storage.bucket('efimerum-fotos');
     var fotoPath = req.files[0].path;
 
-    var types = ['labels'];
-    vision.detect(fotoPath, types, function(err, detections, apiResponse) {
+    var options = {
+        maxResults: 100,
+        types: ['labels', 'safeSearch'],
+        verbose: true
+    };
+    vision.detect(fotoPath, options, function (err, detections, apiResponse) {
         if (err) {
+            fs.unlinkSync(fotoPath);
             res.end('Cloud Vision Error');
         } else {
-
-            fotosBucket.upload(fotoPath, function (err, file) {
-                if (!err) {
-
-                    var photosRef = rootRef.child('photos');
-                    var photoKey = photosRef.push().key;
-                    var photoData = {
-                        originalName: req.files[0].originalname,
-                        creationDate: moment().format(),
-                        fileName: req.files[0].filename,
-                        tags: detections,
-                        url: 'https://storage.googleapis.com/efimerum-fotos/' + req.files[0].filename
-                    };
-                    var updates = {};
-                    updates[photoKey] = photoData;
-                    photosRef.update(updates)
-                        .then(function () {
-                            fs.unlinkSync(fotoPath);
-                            return res.status(200).json({success: true, data: photoData});
-                        }).catch(function (error) {
-                        fotosBucket.delete(req.files[0].originalname);
-                        return res.status(500).json({success: false, error: error});
-                    });
-                } else {
-                    return res.status(500).json({success: false, error: err});
-                }
-            });
+            if (detections.safeSearch.adult == 'LIKELY' || detections.safeSearch.adult == 'VERY_LIKELY' ||
+                detections.safeSearch.spoof == 'LIKELY' || detections.safeSearch.spoof == 'VERY_LIKELY' ||
+                detections.safeSearch.medical == 'LIKELY' || detections.safeSearch.medical == 'VERY_LIKELY' ||
+                detections.safeSearch.violence == 'LIKELY' || detections.safeSearch.violence == 'VERY_LIKELY') {
+                fs.unlinkSync(fotoPath);
+                return res.status(500).json({success: false, error: 'Inappropriate content'});
+            } else {
+                var labels = {};
+                var updates = {};
+                detections.labels.forEach(function (label) {
+                    if (label.score > 75) {
+                        labels[label.desc] = true;
+                        updates['labels/' + label.desc] = true;
+                    }
+                });
+                fotosBucket.upload(fotoPath, function (err, file) {
+                    if (!err) {
+                        var photoKey = rootRef.child('photos').push().key;
+                        var photoData = {
+                            originalName: req.files[0].originalname,
+                            creationDate: moment().format(),
+                            fileName: req.files[0].filename,
+                            labels: labels,
+                            url: 'https://storage.googleapis.com/efimerum-fotos/' + req.files[0].filename
+                        };
+                        updates['photos/' + photoKey] = photoData;
+                        rootRef.update(updates)
+                            .then(function () {
+                                fs.unlinkSync(fotoPath);
+                                return res.status(200).json({success: true, data: photoData});
+                            }).catch(function (error) {
+                                fs.unlinkSync(fotoPath);
+                                fotosBucket.delete(req.files[0].originalname);
+                                return res.status(500).json({success: false, error: error});
+                        });
+                    } else {
+                        fs.unlinkSync(fotoPath);
+                        return res.status(500).json({success: false, error: err});
+                    }
+                });
+            }
         }
     });
 });
@@ -90,11 +107,14 @@ router.delete('/', function (req, res) {
             var photoNameInStorage = snap.val().fileName;
             var foto = fotosBucket.file(photoNameInStorage);
             foto.delete()
-                .then(function() {
+                .then(function () {
                     // Borrar de la BBDD
                     photoRef.remove(function (error) {
                         if (!error) {
-                            return res.status(200).json({success: true, data: {fotoFirebaseID: fotoFirebaseID, photoNameInStorage: photoNameInStorage}});
+                            return res.status(200).json({
+                                success: true,
+                                data: {fotoFirebaseID: fotoFirebaseID, photoNameInStorage: photoNameInStorage}
+                            });
                         } else {
                             return res.status(500).json({success: false, error: error});
                         }
