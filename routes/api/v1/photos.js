@@ -13,11 +13,10 @@ var vision = require('./../../../lib/googleCloudPlatform').vision;
 var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
 
-router.get('/', function (req, res) {
+router.get('/json', function (req, res) {
     var user = firebase.auth().currentUser;
     if (user) {
         console.log('User is signed in', user);
-
     } else {
         console.log('No user is signed in');
     }
@@ -31,6 +30,18 @@ router.get('/', function (req, res) {
         .catch(function (error) {
             return res.status(500).json({success: false, error: error});
         });
+});
+
+router.get('/', function (req, res) {
+    var user = firebase.auth().currentUser;
+    if (user) {
+        console.log('User is signed in', user);
+    } else {
+        console.log('No user is signed in');
+    }
+
+    var photosRef = rootRef.child('photos');
+    return res.status(200).json({success: true, data: photosRef.toString()});
 });
 
 router.post('/', multer.any(), function (req, res) {

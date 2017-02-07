@@ -11,7 +11,6 @@ router.get('/', function (req, res) {
     var user = firebase.auth().currentUser;
     if (user) {
         console.log('User is signed in', user);
-
     } else {
         console.log('No user is signed in');
     }
