@@ -45,7 +45,7 @@ router.get('/', function (req, res) {
 });
 
 router.post('/', multer.any(), function (req, res) {
-    const fotosBucket = storage.bucket('efimerum-fotos');
+    const fotosBucket = storage.bucket('efimerum-photos');
     var fotoPath = req.files[0].path;
 
     var options = {
@@ -81,7 +81,7 @@ router.post('/', multer.any(), function (req, res) {
                             creationDate: moment().format(),
                             fileName: req.files[0].filename,
                             labels: labels,
-                            url: 'https://storage.googleapis.com/efimerum-fotos/' + req.files[0].filename
+                            url: 'https://storage.googleapis.com/efimerum-photos/' + req.files[0].filename
                         };
                         updates['photos/' + photoKey] = photoData;
                         rootRef.update(updates)
@@ -114,7 +114,7 @@ router.delete('/', function (req, res) {
     photoRef.once('value')
         .then(function (snap) {
             // Borrar del Storage
-            var fotosBucket = storage.bucket('efimerum-fotos');
+            var fotosBucket = storage.bucket('efimerum-photos');
             var photoNameInStorage = snap.val().fileName;
             var foto = fotosBucket.file(photoNameInStorage);
             foto.delete()

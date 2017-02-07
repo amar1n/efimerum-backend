@@ -2,6 +2,30 @@
 
 Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
 
+##Server NodeJS-Express
+1) Para crear el server de NdeJS con Express
+
+`express amgnodeexpress --ejs`
+
+2) Para instalar todas las dependencias necesarias, ejecutarlo dentro del folder del proyecto recién creado
+
+`npm install`
+
+3) Para instalar [Multer](https://github.com/expressjs/multer) y así poder subir files al servidor
+
+`npm install --save multer`
+
+4) Crear los folders...
+* lib
+* routes/api/v1
+* public/uploads
+
+5) Eliminar...
+* public/images
+* public/javascripts
+* public/stylesheets
+* routes/users.js (y sus referencias en app.js)
+
 ##Database en Firebase
 1) Crear un proyecto en [Firebase](https://console.firebase.google.com/)
 
@@ -13,33 +37,9 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
 
 5) Indicar el JSON y el Id del proyecto Firebase en la inicialización de Firebase
 
-##Server NodeJS-Express
-1) Para crear el server de NdeJS con Express
-
-`express amgnodeexpress --ejs`
-
-2) Para instalar todas las dependencias necesarias, ejecutarlo dentro del folder del proyecto recién creado
-
-`npm install`
-
-3) Para instalar Firebase y poder acceder a la BBDD
+6) Para instalar Firebase y poder acceder a la BBDD
 
 `npm install --save firebase`
-
-4) Para instalar [Multer](https://github.com/expressjs/multer) y así poder subir files al servidor
-
-`npm install --save multer`
-
-5) Crear los folders...
-* lib
-* routes/api/v1
-* public/uploads
-
-6) Eliminar...
-* public/images
-* public/javascripts
-* public/stylesheets
-* routes/users.js (y sus referencias en app.js)
 
 ##Storage en Google Cloud Platform
 
