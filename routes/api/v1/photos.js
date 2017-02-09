@@ -34,22 +34,23 @@ router.get('/json', function (req, res) {
 
 router.get('/', function (req, res) {
     var user = firebase.auth().currentUser;
+    var userKey = 'CCq864Wku8damv2C5TaZs4s5cpz2';
     if (user) {
-        console.log('User is signed in', user);
+        userKey = user.uid;
+        console.log('User is signed in', user, userKey);
     } else {
-        console.log('No user is signed in');
+        console.log('No user is signed in... so uid will be ' + userKey);
     }
 
     var photosRef = rootRef.child('photos');
     photosRef.once('value')
         .then(function (snap) {
             var snapShuffled = shuffleFirebaseSnapshot(snap);
-            const userKey = 'CCq864Wku8damv2C5TaZs4s5cpz2';
             var updates = {};
             updates['photos_by_users/' + userKey] = snapShuffled;
             rootRef.update(updates)
                 .then(function () {
-                    return res.status(200).json({success: true, data: photosRef.toString() + 'photos_by_users/' + userKey });
+                    return res.status(200).json({success: true, data: rootRef.toString() + 'photos_by_users/' + userKey });
                 }).catch(function (error) {
                     return res.status(500).json({success: false, error: error});
                 });
