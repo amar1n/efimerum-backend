@@ -41,7 +41,22 @@ router.get('/', function (req, res) {
     }
 
     var photosRef = rootRef.child('photos');
-    return res.status(200).json({success: true, data: photosRef.toString()});
+    photosRef.once('value')
+        .then(function (snap) {
+            var snapShuffled = shuffleFirebaseSnapshot(snap);
+            const userKey = 'CCq864Wku8damv2C5TaZs4s5cpz2';
+            var updates = {};
+            updates['photos_by_users/' + userKey] = snapShuffled;
+            rootRef.update(updates)
+                .then(function () {
+                    return res.status(200).json({success: true, data: photosRef.toString() + 'photos_by_users/' + userKey });
+                }).catch(function (error) {
+                    return res.status(500).json({success: false, error: error});
+                });
+        })
+        .catch(function (error) {
+            return res.status(500).json({success: false, error: error});
+        });
 });
 
 router.post('/', multer.any(), function (req, res) {
@@ -84,6 +99,9 @@ router.post('/', multer.any(), function (req, res) {
                             url: 'https://storage.googleapis.com/efimerum-photos/' + req.files[0].filename
                         };
                         updates['photos/' + photoKey] = photoData;
+                        Object.keys(labels).forEach(function (label) {
+                            updates['photos_by_labels/' + label + '/' + photoKey] = photoData;
+                        });
                         rootRef.update(updates)
                             .then(function () {
                                 fs.unlinkSync(fotoPath);
