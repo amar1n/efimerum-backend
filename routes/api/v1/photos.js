@@ -65,6 +65,34 @@ router.get('/json', function (req, res) {
         });
 });
 
+/**
+ * @api {get} /photos
+ * @apiGroup Photos
+ * @apiDescription Retrieve a list of photos
+ * @apiParam {String} uid User's id
+ * @apiParam {String} [label] Filter by label
+ * @apiParam {Number} [latitude] Filter by geolocation (Latitude). Used with longitude and distance. Use geolocation alone or in combination with label
+ * @apiParam {Number} [longitude] Filter by geolocation (Longitude). Used with latitude and distance. Use geolocation alone or in combination with label
+ * @apiParam {Number} [distance] Filter by geolocation (Distance). Used with latitude and longitude. Use geolocation alone or in combination with label
+ * @apiParam {Boolean} [mostViewed] Filter by most viewed. Use alone or in combination with label
+ * @apiParam {Boolean} [closeToDying] Filter by close to dying. Use alone or in combination with label
+ * @apiParam {Boolean} [longestPhotos] Filter by longest photos. Use alone or in combination with label
+ * @apiParam {Boolean} [myPhotos] Filter by the photos posted by the user with the indicated uid. Use alone or in combination with label
+ * @apiExample Example of use:
+ * https://efimerum-48618.appspot.com/api/v1/photos?uid=CCq864Wku8damv2C5TaZs4s5cpz2&label=cartoon&myPhotos=true
+ * @apiSuccessExample
+ * HTTP/1.1 200 OK
+ * {
+ *   "success": true,
+ *   "data": "https://efimerum-48618.firebaseio.com/nodePhotosRequestedByUsers/CCq864Wku8damv2C5TaZs4s5cpz2"
+ * }
+ * @apiErrorExample
+ * HTTP/1.1 404 Bad Request
+ *  {
+ *    "success": false,
+ *    "error": "Wrong API call (query)"
+ *  }
+ */
 router.get('/', function (req, res) {
     var validReqQuery = [
         'uid',
@@ -75,8 +103,7 @@ router.get('/', function (req, res) {
         'mostViewed',
         'closeToDying',
         'longestPhotos',
-        'myPhotos',
-        'lang'];
+        'myPhotos'];
 
     var uid = req.query.uid || 'CCq864Wku8damv2C5TaZs4s5cpz2';
     var label = req.query.label;
@@ -115,6 +142,29 @@ router.get('/', function (req, res) {
         });
 });
 
+/**
+ * @api {post} /photos
+ * @apiGroup Photos
+ * @apiDescription Post a single photo using a form multipart (multipart/form-data)
+ * @apiSuccess {String} data The photo key
+ * @apiParam {String} [uid] User's id
+ * @apiParam {Number} [latitude] The latitude of the shot
+ * @apiParam {Number} [longitude] The longitude of the shot
+ * @apiExample Example of use:
+ * https://efimerum-48618.appspot.com/api/v1/photos?uid=CCq864Wku8damv2C5TaZs4s5cpz2&latitude=41.375395&longitude=2.170624
+ * @apiSuccessExample
+ * HTTP/1.1 200 OK
+ * {
+ *   "success": true,
+ *   "data": "-KcisySBwVA_AevvTJGD"
+ * }
+ * @apiErrorExample
+ * HTTP/1.1 404 Bad Request
+ *  {
+ *    "success": false,
+ *    "error": "Wrong API call (query)"
+ *  }
+ */
 router.post('/', multer.any(), function (req, res) {
     var validReqQuery = [
         'uid',
@@ -200,7 +250,7 @@ router.post('/', multer.any(), function (req, res) {
                         rootRef.update(updates)
                             .then(function () {
                                 fs.unlinkSync(fotoPath);
-                                return res.status(200).json({success: true, data: photoData});
+                                return res.status(200).json({success: true, data: photoKey});
                             }).catch(function (error) {
                                 fs.unlinkSync(fotoPath);
                                 fotosBucket.delete(req.files[0].originalname);

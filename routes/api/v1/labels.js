@@ -7,15 +7,42 @@ var router = express.Router();
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 
-router.get('/', function (req, res) {
-    var user = firebase.auth().currentUser;
-    if (user) {
-        console.log('User is signed in', user);
-    } else {
-        console.log('No user is signed in');
-    }
+const nodeLabels = 'labels';
 
-    var labelsRef = rootRef.child('labels');
+/**
+ * @api {get} /labels
+ * @apiGroup Labels
+ * @apiDescription Retrieve the list of labels
+ * @apiParam {String} [lang] The language required
+ * @apiExample Example of use:
+ * https://efimerum-48618.appspot.com/api/v1/labels
+ * @apiSuccessExample
+ * HTTP/1.1 200 OK
+ * {
+ *   "success": true,
+ *   "data": {
+ *       "EN": {
+ *          "cartoon": true,
+ *          "comic book": true,
+ *          "comics": true,
+ *          "geological phenomenon": true,
+ *          "lake": true,
+ *          "mountain": true,
+ *          "snow": true,
+ *          "weather": true,
+ *          "winter": true
+ *       }
+ *   }
+ * }
+ * @apiErrorExample
+ * HTTP/1.1 500 Bad Request
+ *  {
+ *    "success": false,
+ *    "error": "Wrong API call (query)"
+ *  }
+ */
+router.get('/', function (req, res) {
+    var labelsRef = rootRef.child(nodeLabels);
     labelsRef.once('value')
         .then(function (snap) {
             return res.status(200).json({success: true, data: snap.val()});
