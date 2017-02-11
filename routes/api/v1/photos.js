@@ -10,6 +10,7 @@ var rootRef = firebase.database().ref();
 var shuffleFirebaseSnapshot = require('./../../../lib/utils').shuffleFirebaseJSON;
 var storage = require('./../../../lib/googleCloudPlatform.js').storage;
 var vision = require('./../../../lib/googleCloudPlatform').vision;
+var translate = require('./../../../lib/googleCloudPlatform.js').translate;
 var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
 
@@ -19,6 +20,7 @@ const nodeLabels = 'labels';
 const nodePhotosByLabels = 'photosByLabels';
 const nodePhotosPostedByUsers = 'photosPostedByUsers';
 const languageEN = 'EN';
+const languageES = 'ES';
 const efimerumStorageBucket = 'efimerum-photos';
 const efimerumStorageBucketPublicURL = 'https://storage.googleapis.com/efimerum-photos';
 
@@ -114,7 +116,6 @@ router.get('/', function (req, res) {
     var closeToDying = req.query.closeToDying;
     var longestPhotos = req.query.longestPhotos;
     var myPhotos = req.query.myPhotos;
-    var lang = req.query.lang;
 
     // Validamos que sólo se reciben los query acordados...
     var queryKeys = Object.keys(req.query);
@@ -211,14 +212,24 @@ router.post('/', multer.any(), function (req, res) {
             } else {
                 var labels = {};
                 var labelsEN = {};
+                var labelsES = {};
                 var updates = {};
                 detections.labels.forEach(function (label) {
                     if (label.score > 75) {
                         labelsEN[label.desc] = true;
                         updates[nodeLabels + '/' + languageEN + '/' + label.desc] = true;
+
+                        // Translates the labels into Spanish
+                        translate.translate(label.desc, 'es').then(function (results) {
+                            labelsES[results[0]] = true;
+                            updates[nodeLabels + '/' + languageES + '/' + results[0]] = true;
+                        }).catch(function (error) {
+                            console.log('Error trying to translate the label[' + label.desc + '] to spanish: ' + error);
+                        });
                     }
                 });
                 labels[languageEN] = labelsEN;
+                labels[languageES] = labelsES;
                 fotosBucket.upload(fotoPath, function (err, file) {
                     if (!err) {
                         var photoKey = rootRef.child(nodePhotos).push().key;
@@ -245,6 +256,9 @@ router.post('/', multer.any(), function (req, res) {
                         updates[nodePhotos + '/' + photoKey] = photoData;
                         Object.keys(labelsEN).forEach(function (label) {
                             updates[nodePhotosByLabels + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
+                        });
+                        Object.keys(labelsES).forEach(function (label) {
+                            updates[nodePhotosByLabels + '/' + languageES + '/' + label + '/' + photoKey] = photoData;
                         });
                         updates[nodePhotosPostedByUsers + '/' + uid + '/' + photoKey] = photoData;
                         rootRef.update(updates)
