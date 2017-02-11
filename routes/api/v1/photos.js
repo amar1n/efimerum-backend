@@ -180,13 +180,17 @@ router.post('/', multer.any(), function (req, res) {
                         thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + req.files[0].filename;
                         thumbnailData['width'] = 0;
                         thumbnailData['height'] = 0;
+
+                        var now = moment();
                         var photoData = {
-                            creationDate: moment().format(),
+                            creationDate: now.unix(),
+                            expirationDate: now.add(1, 'hours').unix(),
                             labels: labels,
                             imageData: imageData,
                             thumbnailData: thumbnailData,
                             latitude: latitude,
-                            longitude: longitude
+                            longitude: longitude,
+                            numOfLikes: 0
                         };
                         updates[nodePhotos + '/' + photoKey] = photoData;
                         Object.keys(labelsEN).forEach(function (label) {
