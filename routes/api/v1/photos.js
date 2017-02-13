@@ -136,11 +136,11 @@ router.get('/', function (req, res) {
                 .then(function () {
                     return res.status(200).json({success: true, data: rootRef.toString() + nodePhotosRequestedByUsers + '/' + uid });
                 }).catch(function (error) {
-                    return res.status(500).json({success: false, error: error});
+                    return res.status(503).json({success: false, error: error});
                 });
         })
         .catch(function (error) {
-            return res.status(500).json({success: false, error: error});
+            return res.status(503).json({success: false, error: error});
         });
 });
 
@@ -209,7 +209,7 @@ router.post('/', multer.any(), function (req, res) {
                 detections.safeSearch.medical == 'LIKELY' || detections.safeSearch.medical == 'VERY_LIKELY' ||
                 detections.safeSearch.violence == 'LIKELY' || detections.safeSearch.violence == 'VERY_LIKELY') {
                 fs.unlinkSync(fotoPath);
-                return res.status(500).json({success: false, error: 'Inappropriate content'});
+                return res.status(400).json({success: false, error: 'Inappropriate content'});
             } else {
                 var labels = {};
                 var labelsEN = {};
@@ -272,11 +272,11 @@ router.post('/', multer.any(), function (req, res) {
                             }).catch(function (error) {
                                 fs.unlinkSync(fotoPath);
                                 fotosBucket.delete(req.files[0].originalname);
-                                return res.status(500).json({success: false, error: error});
+                                return res.status(503).json({success: false, error: error});
                         });
                     } else {
                         fs.unlinkSync(fotoPath);
-                        return res.status(500).json({success: false, error: err});
+                        return res.status(503).json({success: false, error: err});
                     }
                 });
             }
