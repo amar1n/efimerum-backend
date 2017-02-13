@@ -13,6 +13,7 @@ var vision = require('./../../../lib/googleCloudPlatform').vision;
 var translate = require('./../../../lib/googleCloudPlatform.js').translate;
 var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
+var sizeOf = require('image-size');
 
 const nodePhotosRequestedByUsers = 'nodePhotosRequestedByUsers';
 const nodePhotos = 'photos';
@@ -191,8 +192,8 @@ router.post('/', multer.any(), function (req, res) {
     }
 
     const fotosBucket = storage.bucket(efimerumStorageBucket);
-    var fotoPath = req.files[0].path;
 
+    var fotoPath = req.files[0].path;
     var options = {
         maxResults: 100,
         types: ['labels', 'safeSearch'],
@@ -235,8 +236,11 @@ router.post('/', multer.any(), function (req, res) {
                         var photoKey = rootRef.child(nodePhotos).push().key;
                         var imageData = {};
                         imageData['url'] = efimerumStorageBucketPublicURL + '/' + req.files[0].filename;
-                        imageData['width'] = 0;
-                        imageData['height'] = 0;
+
+                        //Obtengo las dimensiones de la imagen y las guardo en el json.
+                        var dimensions = sizeOf(fotoPath);
+                        imageData['width'] = dimensions.width;
+                        imageData['height'] = dimensions.height;
                         var thumbnailData = {};
                         thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + req.files[0].filename;
                         thumbnailData['width'] = 0;
