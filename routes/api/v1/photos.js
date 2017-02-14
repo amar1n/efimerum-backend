@@ -14,6 +14,7 @@ var translate = require('./../../../lib/googleCloudPlatform.js').translate;
 var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
 var lwip = require('lwip');
+var sizeOf = require('image-size');
 
 const nodePhotosRequestedByUsers = 'nodePhotosRequestedByUsers';
 const nodePhotos = 'photos';
@@ -139,11 +140,11 @@ router.get('/', function (req, res) {
                         data: rootRef.toString() + nodePhotosRequestedByUsers + '/' + uid
                     });
                 }).catch(function (error) {
-                return res.status(500).json({success: false, error: error});
+                return res.status(503).json({success: false, error: error});
             });
         })
         .catch(function (error) {
-            return res.status(500).json({success: false, error: error});
+            return res.status(503).json({success: false, error: error});
         });
 });
 
@@ -203,7 +204,7 @@ router.post('/', multer.any(), function (req, res) {
 
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
-    console.log('image', photoPath, photoFilename);
+    const fotosBucket = storage.bucket(efimerumStorageBucket);
 
     // 1) Realizamos el SafeSearch y la detección de etiquetas
     var options = {
@@ -213,8 +214,9 @@ router.post('/', multer.any(), function (req, res) {
     };
     vision.detect(photoPath, options, function (err, detections, apiResponse) {
         if (err) {
-            console.log('Cloud Vision Error', err);
-            fs.unlinkSync(photoPath);
+            processErrorInPostPhoto(err, 'Cloud Vision Error', fotosBucket, photoPath, photoFilename, true, false, null, null, false, false);
+            // console.log('Cloud Vision Error', err);
+            // fs.unlinkSync(photoPath);
             return res.status(500).json({success: false, error: 'Cloud Vision Error'});
         }
 
@@ -252,27 +254,37 @@ router.post('/', multer.any(), function (req, res) {
         labels[languageES] = labelsES;
 
         // 3) Subimos la imagen al storage
-        const fotosBucket = storage.bucket(efimerumStorageBucket);
         fotosBucket.upload(photoPath, function (err, file) {
-            if (!err) {
-                console.log('Error storing the image in Google Cloud Storage', err);
-                fs.unlinkSync(photoPath);
+            if (err) {
+                processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket, photoPath, photoFilename, true, false, null, null, false, false);
+                // console.log('Error storing the image in Google Cloud Storage', err);
+                // fs.unlinkSync(photoPath);
                 return res.status(500).json({success: false, error: err});
             }
 
             // 4) Creamos el thumbnail de la imagen
             lwip.open(photoPath, function (err, image) {
                 if (err) {
-                    console.log('Error when open the image!', err);
-                    fs.unlinkSync(photoPath);
-                    fotosBucket.delete(photoFilename);
+                    processErrorInPostPhoto(err, 'Error when open the image!', fotosBucket, photoPath, photoFilename, true, true, null, null, false, false);
+                    // console.log('Error when open the image!', err);
+                    // fs.unlinkSync(photoPath);
+                    // fotosBucket.file(photoFilename).delete(function (err) {
+                    //     if (err) {
+                    //         console.log('Error deleting the image in Google Cloud Storage', err);
+                    //     }
+                    // });
                     return res.status(500).json({success: false, error: 'Error when open the image!'});
                 }
                 image.scale(0.35, function (err, image) {
                     if (err) {
-                        console.log('Error when scale the image!', err);
-                        fs.unlinkSync(photoPath);
-                        fotosBucket.delete(photoFilename);
+                        processErrorInPostPhoto(err, 'Error when scale the image!', fotosBucket, photoPath, photoFilename, true, true, null, null, false, false);
+                        // console.log('Error when scale the image!', err);
+                        // fs.unlinkSync(photoPath);
+                        // fotosBucket.file(photoFilename).delete(function (err) {
+                        //     if (err) {
+                        //         console.log('Error deleting the image in Google Cloud Storage', err);
+                        //     }
+                        // });
                         return res.status(500).json({success: false, error: 'Error when scale the image!'});
                     }
                     var photoSplitedByDot = photoPath.split('.');
@@ -281,36 +293,46 @@ router.post('/', multer.any(), function (req, res) {
                     var thumbnailFilename = thumbnailSplitedBySlash[thumbnailSplitedBySlash.length - 1];
                     image.writeFile(thumbnailPath, function (err) {
                         if (err) {
-                            console.log('Error when save the scaled image!', err);
-                            fs.unlinkSync(photoPath);
-                            fotosBucket.delete(photoFilename);
+                            processErrorInPostPhoto(err, 'Error when save the scaled image!', fotosBucket, photoPath, photoFilename, true, true, null, null, false, false);
+                            // console.log('Error when save the scaled image!', err);
+                            // fs.unlinkSync(photoPath);
+                            // fotosBucket.file(photoFilename).delete(function (err) {
+                            //     if (err) {
+                            //         console.log('Error deleting the image in Google Cloud Storage', err);
+                            //     }
+                            // });
                             return res.status(500).json({
                                 success: false, error: 'Error when save the scaled image!'
                             });
                         }
 
-                        console.log('thumbnail', thumbnailPath, thumbnailFilename);
-
                         // 5) Subimos el thumbnail de la imagen al storage
                         fotosBucket.upload(thumbnailPath, function (err, file) {
-                            if (!err) {
-                                console.log('Error storing the thumbnail in Google Cloud Storage', err);
-                                fs.unlinkSync(photoPath);
-                                fs.unlinkSync(thumbnailPath);
-                                fotosBucket.delete(photoFilename);
+                            if (err) {
+                                processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket, photoPath, photoFilename, true, true, thumbnailPath, null, true, false);
+                                // console.log('Error storing the thumbnail in Google Cloud Storage', err);
+                                // fs.unlinkSync(photoPath);
+                                // fs.unlinkSync(thumbnailPath);
+                                // fotosBucket.file(photoFilename).delete(function (err) {
+                                //     if (err) {
+                                //         console.log('Error deleting the image in Google Cloud Storage', err);
+                                //     }
+                                // });
                                 return res.status(500).json({success: false, error: err});
                             }
 
                             // 6) Generamos los nodos en LA BBDD de Firebase
                             var photoKey = rootRef.child(nodePhotos).push().key;
                             var imageData = {};
-                            imageData['url'] = efimerumStorageBucketPublicURL + '/' + req.files[0].filename;
-                            imageData['width'] = 0;
-                            imageData['height'] = 0;
+                            imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
+                            var dimensions = sizeOf(photoPath);
+                            imageData['width'] = dimensions.width;
+                            imageData['height'] = dimensions.height;
                             var thumbnailData = {};
-                            thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + req.files[0].filename;
-                            thumbnailData['width'] = 0;
-                            thumbnailData['height'] = 0;
+                            thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
+                            var dimensionsThumbnail = sizeOf(thumbnailPath);
+                            thumbnailData['width'] = dimensionsThumbnail.width;
+                            thumbnailData['height'] = dimensionsThumbnail.height;
 
                             var now = moment();
                             var photoData = {
@@ -335,16 +357,23 @@ router.post('/', multer.any(), function (req, res) {
                                 .then(function () {
                                     fs.unlinkSync(photoPath);
                                     fs.unlinkSync(thumbnailPath);
-                                    fotosBucket.delete(photoFilename);
-                                    fotosBucket.delete(thumbnailFilename);
                                     return res.status(200).json({success: true, data: photoKey});
                                 })
                                 .catch(function (error) {
-                                    console.log('Error updating in Firebase', error);
-                                    fs.unlinkSync(photoPath);
-                                    fs.unlinkSync(thumbnailPath);
-                                    fotosBucket.delete(photoFilename);
-                                    fotosBucket.delete(thumbnailFilename);
+                                    processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket, photoPath, photoFilename, true, true, thumbnailPath, thumbnailFilename, true, true);
+                                    // console.log('Error updating in Firebase', error);
+                                    // fs.unlinkSync(photoPath);
+                                    // fs.unlinkSync(thumbnailPath);
+                                    // fotosBucket.file(photoFilename).delete(function (err) {
+                                    //     if (err) {
+                                    //         console.log('Error deleting the image in Google Cloud Storage', err);
+                                    //     }
+                                    // });
+                                    // fotosBucket.file(thumbnailFilename).delete(function (err) {
+                                    //     if (err) {
+                                    //         console.log('Error deleting the thumbnail in Google Cloud Storage', err);
+                                    //     }
+                                    // });
                                     return res.status(500).json({success: false, error: error});
                                 });
                         });
@@ -354,6 +383,32 @@ router.post('/', multer.any(), function (req, res) {
         });
     });
 });
+
+function processErrorInPostPhoto(error, traceMsg, fotosBucket,
+                                 photoPath, photoFilename, fsDeletePhoto, bucketDeletePhoto,
+                                 thumbnailPath, thumbnailFilename, fsDeleteThumbnail, bucketDeleteThumbnail) {
+    console.log(traceMsg, error);
+    if (fsDeletePhoto) {
+        fs.unlinkSync(photoPath);
+    }
+    if (fsDeleteThumbnail) {
+        fs.unlinkSync(thumbnailPath);
+    }
+    if (bucketDeletePhoto) {
+        fotosBucket.file(photoFilename).delete(function (err) {
+            if (err) {
+                console.log('Error deleting the image in Google Cloud Storage', photoFilename, err);
+            }
+        });
+    }
+    if (bucketDeleteThumbnail) {
+        fotosBucket.file(thumbnailFilename).delete(function (err) {
+            if (err) {
+                console.log('Error deleting the thumbnail in Google Cloud Storage', thumbnailFilename, err);
+            }
+        });
+    }
+};
 
 // --------------------------------------
 // --------------------------------------
