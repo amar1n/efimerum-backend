@@ -8,6 +8,7 @@ var fs = require('fs');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var shuffleFirebaseSnapshot = require('./../../../lib/utils').shuffleFirebaseJSON;
+var processErrorInPostPhoto = require('./../../../lib/utils').processErrorInPostPhoto;
 var storage = require('./../../../lib/googleCloudPlatform.js').storage;
 var vision = require('./../../../lib/googleCloudPlatform').vision;
 var translate = require('./../../../lib/googleCloudPlatform.js').translate;
@@ -351,32 +352,6 @@ router.post('/', multer.any(), function (req, res) {
         });
     });
 });
-
-function processErrorInPostPhoto(error, traceMsg, fotosBucket,
-                                 photoPath, photoFilename, fsDeletePhoto, bucketDeletePhoto,
-                                 thumbnailPath, thumbnailFilename, fsDeleteThumbnail, bucketDeleteThumbnail) {
-    console.log(traceMsg, error);
-    if (fsDeletePhoto) {
-        fs.unlinkSync(photoPath);
-    }
-    if (fsDeleteThumbnail) {
-        fs.unlinkSync(thumbnailPath);
-    }
-    if (bucketDeletePhoto) {
-        fotosBucket.file(photoFilename).delete(function (err) {
-            if (err) {
-                console.log('Error deleting the image in Google Cloud Storage', photoFilename, err);
-            }
-        });
-    }
-    if (bucketDeleteThumbnail) {
-        fotosBucket.file(thumbnailFilename).delete(function (err) {
-            if (err) {
-                console.log('Error deleting the thumbnail in Google Cloud Storage', thumbnailFilename, err);
-            }
-        });
-    }
-};
 
 // --------------------------------------
 // --------------------------------------
