@@ -214,9 +214,9 @@ router.post('/', multer.any(), function (req, res) {
     };
     vision.detect(photoPath, options, function (err, detections, apiResponse) {
         if (err) {
-            processErrorInPostPhoto(err, 'Cloud Vision Error', fotosBucket, photoPath, photoFilename, true, false, null, null, false, false);
-            // console.log('Cloud Vision Error', err);
-            // fs.unlinkSync(photoPath);
+            processErrorInPostPhoto(err, 'Cloud Vision Error', fotosBucket,
+                photoPath, photoFilename, true, false,
+                null, null, false, false);
             return res.status(500).json({success: false, error: 'Cloud Vision Error'});
         }
 
@@ -256,35 +256,25 @@ router.post('/', multer.any(), function (req, res) {
         // 3) Subimos la imagen al storage
         fotosBucket.upload(photoPath, function (err, file) {
             if (err) {
-                processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket, photoPath, photoFilename, true, false, null, null, false, false);
-                // console.log('Error storing the image in Google Cloud Storage', err);
-                // fs.unlinkSync(photoPath);
+                processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket,
+                    photoPath, photoFilename, true, false,
+                    null, null, false, false);
                 return res.status(500).json({success: false, error: err});
             }
 
             // 4) Creamos el thumbnail de la imagen
             lwip.open(photoPath, function (err, image) {
                 if (err) {
-                    processErrorInPostPhoto(err, 'Error when open the image!', fotosBucket, photoPath, photoFilename, true, true, null, null, false, false);
-                    // console.log('Error when open the image!', err);
-                    // fs.unlinkSync(photoPath);
-                    // fotosBucket.file(photoFilename).delete(function (err) {
-                    //     if (err) {
-                    //         console.log('Error deleting the image in Google Cloud Storage', err);
-                    //     }
-                    // });
+                    processErrorInPostPhoto(err, 'Error when open the image!', fotosBucket,
+                        photoPath, photoFilename, true, true,
+                        null, null, false, false);
                     return res.status(500).json({success: false, error: 'Error when open the image!'});
                 }
                 image.scale(0.35, function (err, image) {
                     if (err) {
-                        processErrorInPostPhoto(err, 'Error when scale the image!', fotosBucket, photoPath, photoFilename, true, true, null, null, false, false);
-                        // console.log('Error when scale the image!', err);
-                        // fs.unlinkSync(photoPath);
-                        // fotosBucket.file(photoFilename).delete(function (err) {
-                        //     if (err) {
-                        //         console.log('Error deleting the image in Google Cloud Storage', err);
-                        //     }
-                        // });
+                        processErrorInPostPhoto(err, 'Error when scale the image!', fotosBucket,
+                            photoPath, photoFilename, true, true,
+                            null, null, false, false);
                         return res.status(500).json({success: false, error: 'Error when scale the image!'});
                     }
                     var photoSplitedByDot = photoPath.split('.');
@@ -293,14 +283,9 @@ router.post('/', multer.any(), function (req, res) {
                     var thumbnailFilename = thumbnailSplitedBySlash[thumbnailSplitedBySlash.length - 1];
                     image.writeFile(thumbnailPath, function (err) {
                         if (err) {
-                            processErrorInPostPhoto(err, 'Error when save the scaled image!', fotosBucket, photoPath, photoFilename, true, true, null, null, false, false);
-                            // console.log('Error when save the scaled image!', err);
-                            // fs.unlinkSync(photoPath);
-                            // fotosBucket.file(photoFilename).delete(function (err) {
-                            //     if (err) {
-                            //         console.log('Error deleting the image in Google Cloud Storage', err);
-                            //     }
-                            // });
+                            processErrorInPostPhoto(err, 'Error when save the scaled image!', fotosBucket,
+                                photoPath, photoFilename, true, true,
+                                null, null, false, false);
                             return res.status(500).json({
                                 success: false, error: 'Error when save the scaled image!'
                             });
@@ -309,15 +294,9 @@ router.post('/', multer.any(), function (req, res) {
                         // 5) Subimos el thumbnail de la imagen al storage
                         fotosBucket.upload(thumbnailPath, function (err, file) {
                             if (err) {
-                                processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket, photoPath, photoFilename, true, true, thumbnailPath, null, true, false);
-                                // console.log('Error storing the thumbnail in Google Cloud Storage', err);
-                                // fs.unlinkSync(photoPath);
-                                // fs.unlinkSync(thumbnailPath);
-                                // fotosBucket.file(photoFilename).delete(function (err) {
-                                //     if (err) {
-                                //         console.log('Error deleting the image in Google Cloud Storage', err);
-                                //     }
-                                // });
+                                processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
+                                    photoPath, photoFilename, true, true,
+                                    thumbnailPath, null, true, false);
                                 return res.status(500).json({success: false, error: err});
                             }
 
@@ -360,20 +339,9 @@ router.post('/', multer.any(), function (req, res) {
                                     return res.status(200).json({success: true, data: photoKey});
                                 })
                                 .catch(function (error) {
-                                    processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket, photoPath, photoFilename, true, true, thumbnailPath, thumbnailFilename, true, true);
-                                    // console.log('Error updating in Firebase', error);
-                                    // fs.unlinkSync(photoPath);
-                                    // fs.unlinkSync(thumbnailPath);
-                                    // fotosBucket.file(photoFilename).delete(function (err) {
-                                    //     if (err) {
-                                    //         console.log('Error deleting the image in Google Cloud Storage', err);
-                                    //     }
-                                    // });
-                                    // fotosBucket.file(thumbnailFilename).delete(function (err) {
-                                    //     if (err) {
-                                    //         console.log('Error deleting the thumbnail in Google Cloud Storage', err);
-                                    //     }
-                                    // });
+                                    processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
+                                        photoPath, photoFilename, true, true,
+                                        thumbnailPath, thumbnailFilename, true, true);
                                     return res.status(500).json({success: false, error: error});
                                 });
                         });
