@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "API Backend",
   "title": "Documentación de Efimerum-Backend",
-  "url": "http://efimerum-48618.firebaseio.com/api/v1",
+  "url": "https://efimerum-48618.appspot.com/api/v1",
   "template": {
     "forceLanguage": "en"
   }
