@@ -15,7 +15,12 @@ var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
 var lwip = require('lwip');
 var sizeOf = require('image-size');
+var md5 = require('md5');
+var sha1 = require('sha1');
+var sha256 = require('sha256');
+var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
+
 
 const nodePhotos = 'photos';
 const nodeLabels = 'labels';
@@ -24,6 +29,9 @@ const nodePhotosPostedByUser = 'photosPostedByUser';
 const languageEN = 'EN';
 const efimerumStorageBucket = 'efimerum-photos';
 const efimerumStorageBucketPublicURL = 'https://storage.googleapis.com/efimerum-photos';
+
+//Creo un counter para modificar el string que encriptamos
+var counter = 0;
 
 router.get('/json', function (req, res) {
     var photosRef = rootRef.child(nodePhotos);
@@ -185,6 +193,9 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                             thumbnailData['width'] = dimensionsThumbnail.width;
                             thumbnailData['height'] = dimensionsThumbnail.height;
 
+                            //Generamos el string para la ordenación aleatoria de las fotos
+                            var random = "photos" + counter;
+
                             var now = moment();
                             var photoData = {
                                 creationDate: now.unix(),
@@ -195,8 +206,17 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                                 latitude: latitude,
                                 longitude: longitude,
                                 numOfLikes: 0,
-                                owner: uid
+                                owner: uid,
+                                numOfViews: 0,
+                                md5: md5(random),
+                                sha1: sha1(random),
+                                sha256: sha256(random),
+                                randomString: randomstring.generate()
                             };
+
+                            //Sumamos 1 al counter para ir cambiando el string que encriptamos
+                            counter++;
+
                             updates[nodePhotos + '/' + photoKey] = photoData;
                             Object.keys(labelsEN).forEach(function (label) {
                                 updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
