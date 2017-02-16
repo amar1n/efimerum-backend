@@ -21,7 +21,6 @@ var sha256 = require('sha256');
 var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 
-
 const nodePhotos = 'photos';
 const nodeLabels = 'labels';
 const nodePhotosByLabel = 'photosByLabel';
