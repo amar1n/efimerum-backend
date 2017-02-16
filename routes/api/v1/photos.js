@@ -18,8 +18,8 @@ var sizeOf = require('image-size');
 
 const nodePhotos = 'photos';
 const nodeLabels = 'labels';
-const nodePhotosByLabels = 'photosByLabels';
-const nodePhotosPostedByUsers = 'photosPostedByUsers';
+const nodePhotosByLabel = 'photosByLabel';
+const nodePhotosPostedByUser = 'photosPostedByUser';
 const languageEN = 'EN';
 const efimerumStorageBucket = 'efimerum-photos';
 const efimerumStorageBucketPublicURL = 'https://storage.googleapis.com/efimerum-photos';
@@ -210,9 +210,9 @@ router.post('/', multer.any(), function (req, res) {
                             };
                             updates[nodePhotos + '/' + photoKey] = photoData;
                             Object.keys(labelsEN).forEach(function (label) {
-                                updates[nodePhotosByLabels + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
+                                updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
                             });
-                            updates[nodePhotosPostedByUsers + '/' + uid + '/' + photoKey] = photoData;
+                            updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
                             rootRef.update(updates)
                                 .then(function () {
                                     fs.unlinkSync(photoPath);
