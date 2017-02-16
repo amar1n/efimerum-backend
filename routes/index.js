@@ -10,4 +10,8 @@ router.get('/addPhoto', function(req, res, next) {
     res.render('addPhoto');
 });
 
+router.get('/addLike', function(req, res, next) {
+    res.render('addLike');
+});
+
 module.exports = router;

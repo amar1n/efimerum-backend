@@ -61,22 +61,21 @@ router.get('/json', function (req, res) {
  *  }
  */
 /*
+ 0) Validamos que sólo se reciben los query acordados
  1) Realizamos el SafeSearch y la detección de etiquetas
  2) Realizamos la traducción de las etiquetas que superen un umbral de 75 puntos
  3) Subimos la imagen al storage
  4) Creamos el thumbnail de la imagen
  5) Subimos el thumbnail de la imagen al storage
  6) Generamos los nodos en la BBDD de Firebase
+ 7) Persistimos en la BBDD de Firebase los nodos generados
  */
 router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     var validReqQuery = [
         'latitude',
         'longitude'];
 
-    var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = req.query.longitude;
-
-    // Validamos que sólo se reciben los query acordados...
+    // 0) Validamos que sólo se reciben los query acordados
     var queryKeys = Object.keys(req.query);
     for (var j = 0; j < queryKeys.length; j++) {
         if (validReqQuery.indexOf(queryKeys[j]) === -1) {
@@ -85,6 +84,8 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     }
 
     var uid = req.uid;
+    var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = req.query.longitude;
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(efimerumStorageBucket);
@@ -201,6 +202,8 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                                 updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
                             });
                             updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
+
+                            // 7) Persistimos en la BBDD de Firebase todos los nodos generados
                             rootRef.update(updates)
                                 .then(function () {
                                     fs.unlinkSync(photoPath);
