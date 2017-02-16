@@ -15,6 +15,7 @@ var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
 var lwip = require('lwip');
 var sizeOf = require('image-size');
+var firebaseAuth = require('../../../lib/firebaseAuth.js');
 
 const nodePhotos = 'photos';
 const nodeLabels = 'labels';
@@ -41,11 +42,11 @@ router.get('/json', function (req, res) {
  * @apiGroup Photos
  * @apiDescription Post a single photo using a form multipart (multipart/form-data)
  * @apiSuccess {String} data The photo key
- * @apiParam {String} uid User's id
+ * @apiParam {String} idToken User's ID token
  * @apiParam {Number} latitude The latitude of the user performing the action
  * @apiParam {Number} longitude The latitude of the user performing the action
  * @apiExample Example of use:
- * https://efimerum-48618.appspot.com/api/v1/photos?uid=CCq864Wku8damv2C5TaZs4s5cpz2&latitude=41.375395&longitude=2.170624
+ * https://efimerum-48618.appspot.com/api/v1/photos?idToken=XXyXX&latitude=41.375395&longitude=2.170624
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -67,20 +68,13 @@ router.get('/json', function (req, res) {
  5) Subimos el thumbnail de la imagen al storage
  6) Generamos los nodos en la BBDD de Firebase
  */
-router.post('/', multer.any(), function (req, res) {
+router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     var validReqQuery = [
-        'idToken',
         'latitude',
         'longitude'];
 
-    var idToken = req.query.idToken || 'asdasd123wedcsd';
-    var latitude = req.query.latitude || 41.375395; // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = req.query.longitude || 2.170624;
-
-    // Validamos que se reciben parámetros...
-    if (Object.keys(req.params).length) {
-        return res.status(400).json({success: false, error: 'Wrong API call (params)'});
-    }
+    var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = req.query.longitude;
 
     // Validamos que sólo se reciben los query acordados...
     var queryKeys = Object.keys(req.query);
@@ -90,13 +84,7 @@ router.post('/', multer.any(), function (req, res) {
         }
     }
 
-    // var auth = firebase.auth();
-    var uid = req.query.uid || 'CCq864Wku8damv2C5TaZs4s5cpz2';
-    // firebase.auth().verifyIdToken(idToken)
-    //     .then(function (decodedToken) {
-    //         uid = decodedToken.sub;
-    //     });
-
+    var uid = req.uid;
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(efimerumStorageBucket);
