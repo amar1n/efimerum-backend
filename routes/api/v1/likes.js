@@ -43,8 +43,9 @@ const nodeLikesByPhoto = 'likesByPhoto';
  2) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
  3) Persistimos en la BBDD de Firebase los nodos generados
  */
-router.post('/', function (req, res) {
+router.post('/', firebaseAuth(), function (req, res) {
     var validReqQuery = [
+        'idToken',
         'photoKey',
         'latitude',
         'longitude'];
@@ -74,7 +75,6 @@ router.post('/', function (req, res) {
     };
     updates[nodeLikes + '/' + likeKey] = likeData;
     updates[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
-    console.log(updates);
 
     // 2) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
     var photoRef = rootRef.child(nodePhotos + '/' + photoKey);

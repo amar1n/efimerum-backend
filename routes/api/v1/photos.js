@@ -79,6 +79,7 @@ router.get('/json', function (req, res) {
  */
 router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     var validReqQuery = [
+        'idToken',
         'latitude',
         'longitude'];
 
