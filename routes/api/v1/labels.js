@@ -9,7 +9,6 @@ var rootRef = firebase.database().ref();
 
 const nodeLabels = 'labels';
 const languageEN = 'EN';
-const languageES = 'ES';
 
 /**
  * @api {get} /labels
@@ -43,23 +42,27 @@ const languageES = 'ES';
  *    "error": "Wrong API call (language)"
  *  }
  */
+/*
+ 0) Validamos que sólo se reciben los query acordados
+ 1) Validamos el idioma solicitado
+ 2) Leemos las etiquetas de la BBDD de Firebase
+ */
 router.get('/', function (req, res) {
     var validReqQuery = [
         'lang'];
 
-    var lang = req.query.lang;
-
-    // Validamos que sólo se reciben los query acordados...
+    // 0) Validamos que sólo se reciben los query acordados
     var queryKeys = Object.keys(req.query);
-    for (var i = 0; i < queryKeys.length; i++) {
-        if (validReqQuery.indexOf(queryKeys[i]) === -1) {
+    for (var j = 0; j < queryKeys.length; j++) {
+        if (validReqQuery.indexOf(queryKeys[j]) === -1) {
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
 
+    // 1) Validamos el idioma solicitado
+    var lang = req.query.lang;
     var labelsRef = '';
-    // Procesamos el tipo para meterlo en el filtro...
-    var validLanguages = [languageEN, languageES];
+    var validLanguages = [languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
             return res.status(400).json({success: false, error: 'Wrong API call (language)'});
@@ -69,6 +72,7 @@ router.get('/', function (req, res) {
         labelsRef = rootRef.child(nodeLabels);
     }
 
+    // 2) Leemos las etiquetas de la BBDD de Firebase
     labelsRef.once('value')
         .then(function (snap) {
             if (typeof lang !== 'undefined') {
