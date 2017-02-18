@@ -13,7 +13,7 @@ var storage = require('./../../../lib/googleCloudPlatform.js').storage;
 var vision = require('./../../../lib/googleCloudPlatform').vision;
 var multer = require('./../../../lib/utils').multer;
 var moment = require('moment');
-var lwip = require('lwip');
+var thumbnailsCreator = require('lwip-image-thumbnails-creator');
 var sizeOf = require('image-size');
 var md5 = require('md5');
 var sha1 = require('sha1');
@@ -70,14 +70,14 @@ router.get('/json', function (req, res) {
 /*
  0) Validamos que sólo se reciben los query acordados
  1) Realizamos el SafeSearch y la detección de etiquetas
- 2) Realizamos la traducción de las etiquetas que superen un umbral de 75 puntos
+ 2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
  3) Subimos la imagen al storage
  4) Creamos el thumbnail de la imagen
  5) Subimos el thumbnail de la imagen al storage
  6) Generamos los nodos en la BBDD de Firebase
  7) Persistimos en la BBDD de Firebase los nodos generados
  */
-router.post('/', firebaseAuth(), multer.any(), function (req, res) {
+router.post('/', multer.any(), function (req, res) {
     var validReqQuery = [
         'idToken',
         'latitude',
@@ -91,7 +91,7 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
         }
     }
 
-    var uid = req.uid;
+    var uid = req.uid || 'batman';
     var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
     var longitude = req.query.longitude;
     var photoPath = req.files[0].path;
@@ -121,7 +121,7 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
             return res.status(500).json({success: false, error: 'Inappropriate content'});
         }
 
-        // 2) Realizamos la traducción de las etiquetas que superen un umbral de 75 puntos
+        // 2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
         var labels = {};
         var labelsEN = {};
         var updates = {};
@@ -143,102 +143,97 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
             }
 
             // 4) Creamos el thumbnail de la imagen
-            lwip.open(photoPath, function (err, image) {
-                if (err) {
-                    processErrorInPostPhoto(err, 'Error when open the image!', fotosBucket,
-                        photoPath, photoFilename, true, true,
-                        null, null, false, false);
-                    return res.status(500).json({success: false, error: 'Error when open the image!'});
-                }
-                image.scale(0.35, function (err, image) {
+            var options = {
+                saveToDisk: false
+            };
+            thumbnailsCreator.createThumbnail(photoPath, {
+                maxWidth: 300,
+                maxHeight: 300
+            }, options).then(function (resp) {
+                var photoSplitedByDot = photoPath.split('.');
+                var thumbnailPath = photoSplitedByDot[0] + '_thumb.' + photoSplitedByDot[photoSplitedByDot.length - 1];
+                var thumbnailSplitedBySlash = thumbnailPath.split('/');
+                var thumbnailFilename = thumbnailSplitedBySlash[thumbnailSplitedBySlash.length - 1];
+                resp.thumbnail.image.writeFile(thumbnailPath, function (err) {
                     if (err) {
-                        processErrorInPostPhoto(err, 'Error when scale the image!', fotosBucket,
+                        processErrorInPostPhoto(err, 'Error writeFile Thumbnail', fotosBucket,
                             photoPath, photoFilename, true, true,
-                            null, null, false, false);
-                        return res.status(500).json({success: false, error: 'Error when scale the image!'});
+                            thumbnailPath, null, true, false);
+                        return res.status(500).json({success: false, error: err});
                     }
-                    var photoSplitedByDot = photoPath.split('.');
-                    var thumbnailPath = photoSplitedByDot[0] + '_thumb.' + photoSplitedByDot[photoSplitedByDot.length - 1];
-                    var thumbnailSplitedBySlash = thumbnailPath.split('/');
-                    var thumbnailFilename = thumbnailSplitedBySlash[thumbnailSplitedBySlash.length - 1];
-                    image.writeFile(thumbnailPath, function (err) {
+                    // 5) Subimos el thumbnail de la imagen al storage
+                    fotosBucket.upload(thumbnailPath, function (err, file) {
                         if (err) {
-                            processErrorInPostPhoto(err, 'Error when save the scaled image!', fotosBucket,
+                            processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
                                 photoPath, photoFilename, true, true,
-                                null, null, false, false);
-                            return res.status(500).json({
-                                success: false, error: 'Error when save the scaled image!'
-                            });
+                                thumbnailPath, null, true, false);
+                            return res.status(500).json({success: false, error: err});
                         }
 
-                        // 5) Subimos el thumbnail de la imagen al storage
-                        fotosBucket.upload(thumbnailPath, function (err, file) {
-                            if (err) {
-                                processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
-                                    photoPath, photoFilename, true, true,
-                                    thumbnailPath, null, true, false);
-                                return res.status(500).json({success: false, error: err});
-                            }
+                        // 6) Generamos los nodos en la BBDD de Firebase
+                        var photoKey = rootRef.child(nodePhotos).push().key;
+                        var imageData = {};
+                        imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
+                        var dimensions = sizeOf(photoPath);
+                        imageData['width'] = dimensions.width;
+                        imageData['height'] = dimensions.height;
+                        imageData['fileName'] = photoFilename;
+                        var thumbnailData = {};
+                        thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
+                        var dimensionsThumbnail = sizeOf(thumbnailPath);
+                        thumbnailData['width'] = dimensionsThumbnail.width;
+                        thumbnailData['height'] = dimensionsThumbnail.height;
+                        thumbnailData['fileName'] = thumbnailFilename;
 
-                            // 6) Generamos los nodos en la BBDD de Firebase
-                            var photoKey = rootRef.child(nodePhotos).push().key;
-                            var imageData = {};
-                            imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
-                            var dimensions = sizeOf(photoPath);
-                            imageData['width'] = dimensions.width;
-                            imageData['height'] = dimensions.height;
-                            var thumbnailData = {};
-                            thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
-                            var dimensionsThumbnail = sizeOf(thumbnailPath);
-                            thumbnailData['width'] = dimensionsThumbnail.width;
-                            thumbnailData['height'] = dimensionsThumbnail.height;
+                        //Generamos el string para la ordenación aleatoria de las fotos
+                        var random = "photos" + counter;
 
-                            //Generamos el string para la ordenación aleatoria de las fotos
-                            var random = "photos" + counter;
+                        var now = moment();
+                        var photoData = {
+                            creationDate: now.unix(),
+                            expirationDate: now.add(1, 'hours').unix(),
+                            labels: labels,
+                            imageData: imageData,
+                            thumbnailData: thumbnailData,
+                            latitude: latitude,
+                            longitude: longitude,
+                            numOfLikes: 0,
+                            owner: uid,
+                            md5: md5(random),
+                            sha1: sha1(random),
+                            sha256: sha256(random),
+                            randomString: randomstring.generate()
+                        };
 
-                            var now = moment();
-                            var photoData = {
-                                creationDate: now.unix(),
-                                expirationDate: now.add(1, 'hours').unix(),
-                                labels: labels,
-                                imageData: imageData,
-                                thumbnailData: thumbnailData,
-                                latitude: latitude,
-                                longitude: longitude,
-                                numOfLikes: 0,
-                                owner: uid,
-                                numOfViews: 0,
-                                md5: md5(random),
-                                sha1: sha1(random),
-                                sha256: sha256(random),
-                                randomString: randomstring.generate()
-                            };
+                        //Sumamos 1 al counter para ir cambiando el string que encriptamos
+                        counter++;
 
-                            //Sumamos 1 al counter para ir cambiando el string que encriptamos
-                            counter++;
-
-                            updates[nodePhotos + '/' + photoKey] = photoData;
-                            Object.keys(labelsEN).forEach(function (label) {
-                                updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
-                            });
-                            updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
-
-                            // 7) Persistimos en la BBDD de Firebase todos los nodos generados
-                            rootRef.update(updates)
-                                .then(function () {
-                                    fs.unlinkSync(photoPath);
-                                    fs.unlinkSync(thumbnailPath);
-                                    return res.status(200).json({success: true, data: photoKey});
-                                })
-                                .catch(function (error) {
-                                    processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
-                                        photoPath, photoFilename, true, true,
-                                        thumbnailPath, thumbnailFilename, true, true);
-                                    return res.status(500).json({success: false, error: error});
-                                });
+                        updates[nodePhotos + '/' + photoKey] = photoData;
+                        Object.keys(labelsEN).forEach(function (label) {
+                            updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
                         });
+                        updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
+
+                        // 7) Persistimos en la BBDD de Firebase todos los nodos generados
+                        rootRef.update(updates)
+                            .then(function () {
+                                fs.unlinkSync(photoPath);
+                                fs.unlinkSync(thumbnailPath);
+                                return res.status(200).json({success: true, data: photoKey});
+                            })
+                            .catch(function (error) {
+                                processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
+                                    photoPath, photoFilename, true, true,
+                                    thumbnailPath, thumbnailFilename, true, true);
+                                return res.status(500).json({success: false, error: error});
+                            });
                     });
                 });
+            }, function (err) {
+                processErrorInPostPhoto(err, 'Error when create thumbnail!', fotosBucket,
+                    photoPath, photoFilename, true, true,
+                    null, null, false, false);
+                return res.status(500).json({success: false, error: 'Error when create thumbnail!'});
             });
         });
     });

@@ -59,7 +59,7 @@ router.post('/', firebaseAuth(), function (req, res) {
     }
 
     // 1) Generamos los nodos en la BBDD de Firebase
-    var uid = req.uid;
+    var uid = req.uid || 'batman';
     var photoKey = req.query.photoKey;
     var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
     var longitude = req.query.longitude;
@@ -70,7 +70,7 @@ router.post('/', firebaseAuth(), function (req, res) {
         creationDate: now.unix(),
         latitude: latitude,
         longitude: longitude,
-        user: 'CCq864Wku8damv2C5TaZs4s5cpz2',
+        user: uid,
         photo: photoKey
     };
     updates[nodeLikes + '/' + likeKey] = likeData;
