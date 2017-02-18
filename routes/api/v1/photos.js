@@ -77,7 +77,7 @@ router.get('/json', function (req, res) {
  6) Generamos los nodos en la BBDD de Firebase
  7) Persistimos en la BBDD de Firebase los nodos generados
  */
-router.post('/', multer.any(), function (req, res) {
+router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     var validReqQuery = [
         'idToken',
         'latitude',

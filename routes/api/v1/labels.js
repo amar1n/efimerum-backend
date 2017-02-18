@@ -47,7 +47,7 @@ const languageEN = 'EN';
  1) Validamos el idioma solicitado
  2) Leemos las etiquetas de la BBDD de Firebase
  */
-router.get('/', function (req, res) {
+router.get('/', firebaseAuth(), function (req, res) {
     var validReqQuery = [
         'lang'];
 
