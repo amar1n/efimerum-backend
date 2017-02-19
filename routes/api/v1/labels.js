@@ -6,6 +6,7 @@ var router = express.Router();
 
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
+var firebaseAuth = require('../../../lib/firebaseAuth.js');
 
 const nodeLabels = 'labels';
 const languageEN = 'EN';
