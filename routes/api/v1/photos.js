@@ -47,7 +47,7 @@ router.get('/json', function (req, res) {
 /**
  * @api {post} /photos
  * @apiGroup Photos
- * @apiDescription Post a single photo using a form multipart (multipart/form-data)
+ * @apiDescription Post a single photo using a form multipart (multipart/form-data). Only jpeg and png are accepted.
  * @apiSuccess {String} data The photo key
  * @apiParam {String} idToken User's ID token
  * @apiParam {Number} latitude The latitude of the user performing the action
