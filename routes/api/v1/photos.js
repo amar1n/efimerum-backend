@@ -25,9 +25,13 @@ const nodePhotos = 'photos';
 const nodeLabels = 'labels';
 const nodePhotosByLabel = 'photosByLabel';
 const nodePhotosPostedByUser = 'photosPostedByUser';
+const nodeGeoFirePhotos = 'geofirePhotos';
 const languageEN = 'EN';
 const efimerumStorageBucket = 'efimerum-photos';
 const efimerumStorageBucketPublicURL = 'https://storage.googleapis.com/efimerum-photos';
+
+var GeoFire = require('geofire');
+var geoFire = new GeoFire(rootRef.child(nodeGeoFirePhotos));
 
 router.get('/json', function (req, res) {
     var photosRef = rootRef.child(nodePhotos);
@@ -73,6 +77,7 @@ router.get('/json', function (req, res) {
  5) Subimos el thumbnail de la imagen al storage
  6) Generamos los nodos en la BBDD de Firebase
  7) Persistimos en la BBDD de Firebase los nodos generados
+ 8) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     var validReqQuery = [
@@ -89,8 +94,8 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     }
 
     var uid = req.uid || 'batman';
-    var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = req.query.longitude;
+    var latitude = parseFloat(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = parseFloat(req.query.longitude);
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(efimerumStorageBucket);
@@ -210,7 +215,14 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                             .then(function () {
                                 fs.unlinkSync(photoPath);
                                 fs.unlinkSync(thumbnailPath);
-                                return res.status(200).json({success: true, data: photoKey});
+
+                                // 8) Persistimos en la BBDD de Firebase la info de GeoFire
+                                geoFire.set(photoKey, [latitude, longitude]).then(function() {
+                                    return res.status(200).json({success: true, data: photoKey});
+                                }).catch(function(error) {
+                                    console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey);
+                                    return res.status(500).json({success: false, error: 'Photo added without GeoFire info!'});
+                                });
                             })
                             .catch(function (error) {
                                 processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,

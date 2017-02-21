@@ -17,6 +17,7 @@
     "ejs": "~2.3.3",
     "express": "~4.13.1",
     "firebase": "^3.6.7",
+    "geofire": "^4.1.2",
     "image-size": "^0.5.1",
     "lwip-image-thumbnails-creator": "0.0.3",
     "md5": "^2.2.1",

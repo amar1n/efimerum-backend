@@ -29,6 +29,7 @@ app.use('/api/v1/photos', require('./routes/api/v1/photos'));
 app.use('/api/v1/labels', require('./routes/api/v1/labels'));
 app.use('/api/v1/likes', require('./routes/api/v1/likes'));
 app.use('/api/v1/clean', require('./routes/api/v1/clean'));
+app.use('/api/v1/geofire', require('./routes/api/v1/geofire'));
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

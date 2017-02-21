@@ -12,6 +12,10 @@ var firebaseAuth = require('../../../lib/firebaseAuth.js');
 const nodePhotos = 'photos';
 const nodeLikes = 'likes';
 const nodeLikesByPhoto = 'likesByPhoto';
+const nodeGeoFireLikes = 'geofireLikes';
+
+var GeoFire = require('geofire');
+var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
 
 /**
  * @api {post} /likes
@@ -42,6 +46,7 @@ const nodeLikesByPhoto = 'likesByPhoto';
  1) Generamos los nodos en la BBDD de Firebase
  2) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
  3) Persistimos en la BBDD de Firebase los nodos generados
+ 4) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), function (req, res) {
     var validReqQuery = [
@@ -61,8 +66,8 @@ router.post('/', firebaseAuth(), function (req, res) {
     // 1) Generamos los nodos en la BBDD de Firebase
     var uid = req.uid || 'batman';
     var photoKey = req.query.photoKey;
-    var latitude = req.query.latitude; // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = req.query.longitude;
+    var latitude = parseFloat(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = parseFloat(req.query.longitude);
     var updates = {};
     var likeKey = rootRef.child(nodeLikes).push().key;
     var now = moment();
@@ -70,8 +75,8 @@ router.post('/', firebaseAuth(), function (req, res) {
         creationDate: now.unix(),
         latitude: latitude,
         longitude: longitude,
-        user: uid,
-        photo: photoKey
+        userId: uid,
+        photoKey: photoKey
     };
     updates[nodeLikes + '/' + likeKey] = likeData;
     updates[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
@@ -95,7 +100,14 @@ router.post('/', firebaseAuth(), function (req, res) {
             // 3) Persistimos en la BBDD de Firebase los nodos generados
             rootRef.update(updates)
                 .then(function () {
-                    return res.status(200).json({success: true, data: likeKey});
+
+                    // 4) Persistimos en la BBDD de Firebase la info de GeoFire
+                    geoFire.set(likeKey, [latitude, longitude]).then(function() {
+                        return res.status(200).json({success: true, data: likeKey});
+                    }).catch(function(error) {
+                        console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey, '....with likeKey:', likeKey);
+                        return res.status(500).json({success: false, error: 'Like added without GeoFire info!'});
+                    });
                 })
                 .catch(function (error) {
                     return res.status(500).json({success: false, error: error});
