@@ -69,7 +69,7 @@ router.get('/json', function (req, res) {
  *  }
  */
 /*
- 0) Validamos que sólo se reciben los query acordados
+ 0) Validamos que se reciben los query acordados
  1) Realizamos el SafeSearch y la detección de etiquetas
  2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
  3) Subimos la imagen al storage
@@ -81,21 +81,27 @@ router.get('/json', function (req, res) {
  */
 router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     var validReqQuery = [
-        'idToken',
         'latitude',
         'longitude'];
 
-    // 0) Validamos que sólo se reciben los query acordados
+    // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
-    for (var j = 0; j < queryKeys.length; j++) {
-        if (validReqQuery.indexOf(queryKeys[j]) === -1) {
+    for (var i = 0; i < validReqQuery.length; i++) {
+        var bFlag = false;
+        for (var j = 0; j < queryKeys.length; j++) {
+            if (validReqQuery[i] === queryKeys[j]) {
+                bFlag = true;
+                break;
+            }
+        }
+        if (!bFlag) {
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
 
     var uid = req.uid || 'batman';
-    var latitude = parseFloat(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = parseFloat(req.query.longitude);
+    var latitude = Number(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = Number(req.query.longitude);
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(efimerumStorageBucket);

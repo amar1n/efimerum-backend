@@ -42,7 +42,7 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  *  }
  */
 /*
- 0) Validamos que sólo se reciben los query acordados
+ 0) Validamos que se reciben los query acordados
  1) Generamos los nodos en la BBDD de Firebase
  2) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
  3) Persistimos en la BBDD de Firebase los nodos generados
@@ -50,15 +50,21 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  */
 router.post('/', firebaseAuth(), function (req, res) {
     var validReqQuery = [
-        'idToken',
         'photoKey',
         'latitude',
         'longitude'];
 
-    // 0) Validamos que sólo se reciben los query acordados
+    // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
-    for (var j = 0; j < queryKeys.length; j++) {
-        if (validReqQuery.indexOf(queryKeys[j]) === -1) {
+    for (var i = 0; i < validReqQuery.length; i++) {
+        var bFlag = false;
+        for (var j = 0; j < queryKeys.length; j++) {
+            if (validReqQuery[i] === queryKeys[j]) {
+                bFlag = true;
+                break;
+            }
+        }
+        if (!bFlag) {
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
@@ -97,6 +103,15 @@ router.post('/', firebaseAuth(), function (req, res) {
         } else if (!committed) {
             return res.status(500).json({success: false, error: 'Transaction aborted!'});
         } else {
+
+            console.log('...................', snapshot);
+
+            // Falta actualizar la foto en el resto de sitios en los que aparece...
+            //      - photosByLabel
+            //      - photosPostedByUser
+            //      - photosLikedByUser
+
+
             // 3) Persistimos en la BBDD de Firebase los nodos generados
             rootRef.update(updates)
                 .then(function () {
