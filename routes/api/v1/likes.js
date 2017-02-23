@@ -30,6 +30,8 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  * @apiParam {Number} photoKey Photo identifier
  * @apiParam {Number} latitude The latitude of the user performing the action
  * @apiParam {Number} longitude The longitude of the user performing the action
+ * @apiParam [String] uid Used by bash tasks. User's ID. Use in conjunction with 'test'
+ * @apiParam [String] test Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
  * https://efimerum-48618.appspot.com/api/v1/likes?idToken=XXyXX&photoKey=-KcwxqctGBzxhzI5zJfH&latitude=41.375395&longitude=2.170624
  * @apiSuccessExample

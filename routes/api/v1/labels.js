@@ -16,6 +16,8 @@ const languageEN = 'EN';
  * @apiGroup Labels
  * @apiDescription Retrieve the list of labels
  * @apiParam {String} [lang] The language required
+ * @apiParam [String] uid Used by bash tasks. User's ID. Use in conjunction with 'test'
+ * @apiParam [String] test Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
  * https://efimerum-48618.appspot.com/api/v1/labels?lang=EN
  * @apiSuccessExample
