@@ -8,11 +8,15 @@ var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var moment = require('moment');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
+var _under = require('underscore');
 
 const nodePhotos = 'photos';
+const nodePhotosByLabel = 'photosByLabel';
 const nodeLikes = 'likes';
 const nodeLikesByPhoto = 'likesByPhoto';
+const nodePhotosPostedByUser = 'photosPostedByUser';
 const nodeGeoFireLikes = 'geofireLikes';
+const languageEN = 'EN';
 
 var GeoFire = require('geofire');
 var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
@@ -43,10 +47,15 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  */
 /*
  0) Validamos que se reciben los query acordados
- 1) Generamos los nodos en la BBDD de Firebase
- 2) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
- 3) Persistimos en la BBDD de Firebase los nodos generados
- 4) Persistimos en la BBDD de Firebase la info de GeoFire
+ 1) Generamos los nodos para los likes en la BBDD de Firebase
+ 2) Preparamos los nodos de la photo que hay que actualizar en la BBDD de Firebase
+      - photosByLabel
+      - photosPostedByUser
+      - photosLikedByUser
+ 3) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
+ 4) Rellenamos los nodos de la photo que hay que actualizar en la BBDD de Firebase
+ 5) Persistimos en la BBDD de Firebase los nodos generados
+ 6) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), function (req, res) {
     var validReqQuery = [
@@ -69,12 +78,12 @@ router.post('/', firebaseAuth(), function (req, res) {
         }
     }
 
-    // 1) Generamos los nodos en la BBDD de Firebase
+    // 1) Generamos los nodos para los likes en la BBDD de Firebase
     var uid = req.uid || 'batman';
     var photoKey = req.query.photoKey;
-    var latitude = parseFloat(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = parseFloat(req.query.longitude);
-    var updates = {};
+    var latitude = Number(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = Number(req.query.longitude);
+    var updatesLike = {};
     var likeKey = rootRef.child(nodeLikes).push().key;
     var now = moment();
     var likeData = {
@@ -84,51 +93,68 @@ router.post('/', firebaseAuth(), function (req, res) {
         userId: uid,
         photoKey: photoKey
     };
-    updates[nodeLikes + '/' + likeKey] = likeData;
-    updates[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
+    updatesLike[nodeLikes + '/' + likeKey] = likeData;
+    updatesLike[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
 
-    // 2) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
     var photoRef = rootRef.child(nodePhotos + '/' + photoKey);
-    photoRef.transaction(function (currentData) {
-        if (currentData != null) {
-            currentData.numOfLikes = currentData.numOfLikes + 1;
-            currentData.expirationDate = moment.unix(currentData.expirationDate).add(30, 'minutes').unix();
-            return currentData;
-        } else {
-            return 0;
-        }
-    }, function (error, committed, snapshot) {
-        if (error) {
-            return res.status(500).json({success: false, error: 'Transaction failed abnormally! ' + error.message});
-        } else if (!committed) {
-            return res.status(500).json({success: false, error: 'Transaction aborted!'});
-        } else {
+    photoRef.once('value')
+        .then(function (snap) {
+            var foto = snap.val();
 
-            console.log('...................', snapshot);
-
-            // Falta actualizar la foto en el resto de sitios en los que aparece...
+            // 2) Preparamos los nodos de la photo que hay que actualizar en la BBDD de Firebase
             //      - photosByLabel
             //      - photosPostedByUser
-            //      - photosLikedByUser
+            //      - TODO: photosLikedByUser
+            var updatesPhoto = {};
+            Object.keys(foto.labels[languageEN]).forEach(function (label) {
+                updatesPhoto[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = '';
+            });
+            updatesPhoto[nodePhotosPostedByUser + '/' + foto.owner + '/' + photoKey] = '';
+            // TODO: photosLikedByUser
 
+            // 3) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
+            photoRef.transaction(function (currentData) {
+                if (currentData != null) {
+                    currentData.numOfLikes = currentData.numOfLikes + 1;
+                    currentData.expirationDate = moment.unix(currentData.expirationDate).add(30, 'minutes').unix();
+                    return currentData;
+                } else {
+                    return 0;
+                }
+            }, function (error, committed, snapshot) {
+                if (error) {
+                    return res.status(500).json({success: false, error: 'Transaction failed abnormally! ' + error.message});
+                } else if (!committed) {
+                    return res.status(500).json({success: false, error: 'Transaction aborted!'});
+                } else {
 
-            // 3) Persistimos en la BBDD de Firebase los nodos generados
-            rootRef.update(updates)
-                .then(function () {
-
-                    // 4) Persistimos en la BBDD de Firebase la info de GeoFire
-                    geoFire.set(likeKey, [latitude, longitude]).then(function() {
-                        return res.status(200).json({success: true, data: likeKey});
-                    }).catch(function(error) {
-                        console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey, '....with likeKey:', likeKey);
-                        return res.status(500).json({success: false, error: 'Like added without GeoFire info!'});
+                    // 4) Rellenamos los nodos de la photo que hay que actualizar en la BBDD de Firebase
+                    Object.keys(updatesPhoto).forEach(function (x) {
+                        updatesPhoto[x] = snapshot.val();
                     });
-                })
-                .catch(function (error) {
-                    return res.status(500).json({success: false, error: error});
-                });
-        }
-    });
+
+                    // 5) Persistimos en la BBDD de Firebase los nodos generados
+                    var updates = _under.extend(updatesLike, updatesPhoto);
+                    rootRef.update(updates)
+                        .then(function () {
+
+                            // 6) Persistimos en la BBDD de Firebase la info de GeoFire
+                            geoFire.set(likeKey, [latitude, longitude]).then(function() {
+                                return res.status(200).json({success: true, data: likeKey});
+                            }).catch(function(error) {
+                                console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey, '....with likeKey:', likeKey);
+                                return res.status(500).json({success: false, error: 'Like added without GeoFire info!'});
+                            });
+                        })
+                        .catch(function (error) {
+                            return res.status(500).json({success: false, error: error});
+                        });
+                }
+            });
+        })
+        .catch(function (error) {
+            return res.status(500).json({success: false, error: error});
+        });
 });
 
 // --------------------------------------

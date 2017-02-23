@@ -31,9 +31,31 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
 
 2) En la FirebaseConsola del proyecto recién creado, se deben activar los proveedores de autenticación necesarios. Puede que sea necesario la creación de usuarios en la FirebaseConsola del proyecto recién creado.
 
-3) En la FirebaseConsola del proyecto recién creado, se deben retocar las reglas de la BBDD.
+3) En la FirebaseConsola del proyecto recién creado, se deben retocar las reglas de la BBDD de la sigiente manera...
+{
+  "rules": {
+    ".read": true,
+    ".write": "auth.uid === 'wolverine'",
+    "photosByLabel": {
+      "$language": {
+        "$label": {
+          "$photo_id": {
+            ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+          }
+        }
+      }
+    },
+    "photosPostedByUser": {
+      "$user_id": {
+        "$photo_id": {
+          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+        }
+      }
+    }
+  }
+}
 
-4) Crear una Service account key en la [GoogleCloudConsola](https://console.cloud.google.com), en API Manager / Credentials. Luego copiar el json en el proyecto y referenciarlo en la inicialización de Firebase.
+4) Crear una Service account key en la [GoogleCloudConsole](https://console.cloud.google.com), en API Manager / Credentials. Luego copiar el json en el proyecto y referenciarlo en la inicialización de Firebase.
 
 5) Indicar el JSON y el Id del proyecto Firebase en la inicialización de Firebase
 
