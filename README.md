@@ -35,22 +35,53 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
 {
   "rules": {
     ".read": true,
-    ".write": "auth.uid === 'wolverine'",
+    "geofireLikes": {
+      ".write": "auth.uid === 'wolverine'"
+    },
+    "geofirePhotos": {
+      ".write": "auth.uid === 'wolverine'"
+    },
+    "labels": {
+      ".write": "auth.uid === 'wolverine'"
+    },
+    "likes": {
+      ".write": "auth.uid === 'wolverine'"
+    },
+    "likesByPhoto": {
+      ".write": "auth.uid === 'wolverine'"
+    },
+    "photos": {
+      ".write": "auth.uid === 'wolverine'"
+    },
     "photosByLabel": {
       "$language": {
         "$label": {
           "$photo_id": {
+				    ".write": "auth.uid === 'wolverine'",
             ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
           }
         }
       }
     },
+    "photosLikedByUser": {
+      "$photo_id": {
+        ".write": "auth.uid === 'wolverine'",
+        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+      }
+    },
     "photosPostedByUser": {
       "$user_id": {
         "$photo_id": {
+          ".write": "auth.uid === 'wolverine'",
           ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
         }
       }
+    },
+    "users": {
+      ".write": "auth.uid != null"
+    },
+    "usersByPhotoLiked": {
+      ".write": "auth.uid === 'wolverine'"
     }
   }
 }
