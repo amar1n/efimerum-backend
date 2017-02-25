@@ -21,6 +21,7 @@ var sha256 = require('sha256');
 var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 
+const node_Photos = '_photos';
 const nodePhotos = 'photos';
 const nodeLabels = 'labels';
 const nodePhotosByLabel = 'photosByLabel';
@@ -71,6 +72,14 @@ router.get('/json', function (req, res) {
  *  }
  */
 /*
+ Este endpoint toca los siguientes nodos en Firebase...
+ - _photos: Crea una foto para uso interno del backend. Esta foto tendrá todas los likes dentro
+ - geofirePhotos: Crea la info de geolocalización de la foto usando GeoFire, para que los dispositivos puedan hacer búsquedas de fotos por distancia
+ - photos: Crea una foto, para que los dispositivos puedan hacer búsquedas aleatorias
+ - photosByLabel: Relaciona la foto con sus etiquetas, para que los dispositivos puedan hacer búsquedas de fotos por etiqueta
+ - photosPostedByUser: Relaciona la foto con el usuario que la creo, para que los dispositivos puedan mostrar las fotos subidas por usuario
+
+ Este endpoint realiza las siguientes acciones...
  0) Validamos que se reciben los query acordados
  1) Realizamos el SafeSearch y la detección de etiquetas
  2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
@@ -78,7 +87,7 @@ router.get('/json', function (req, res) {
  4) Creamos el thumbnail de la imagen
  5) Subimos el thumbnail de la imagen al storage
  6) Generamos los nodos en la BBDD de Firebase
- 7) Persistimos en la BBDD de Firebase los nodos generados
+ 7) Persistimos en la BBDD de Firebase todos los nodos generados
  8) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), multer.any(), function (req, res) {
@@ -217,6 +226,7 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                             updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
                         });
                         updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
+                        updates[node_Photos + '/' + photoKey] = photoData;
 
                         // 7) Persistimos en la BBDD de Firebase todos los nodos generados
                         rootRef.update(updates)
@@ -225,11 +235,14 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                                 fs.unlinkSync(thumbnailPath);
 
                                 // 8) Persistimos en la BBDD de Firebase la info de GeoFire
-                                geoFire.set(photoKey, [latitude, longitude]).then(function() {
+                                geoFire.set(photoKey, [latitude, longitude]).then(function () {
                                     return res.status(200).json({success: true, data: photoKey});
-                                }).catch(function(error) {
+                                }).catch(function (error) {
                                     console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey);
-                                    return res.status(500).json({success: false, error: 'Photo added without GeoFire info!'});
+                                    return res.status(500).json({
+                                        success: false,
+                                        error: 'Photo added without GeoFire info!'
+                                    });
                                 });
                             })
                             .catch(function (error) {

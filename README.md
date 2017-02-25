@@ -35,6 +35,12 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
 {
   "rules": {
     ".read": true,
+    "_photos": {
+      "$photo_id": {
+        ".write": "auth.uid === 'wolverine'",
+        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+      }
+    },
     "geofireLikes": {
       ".write": "auth.uid === 'wolverine'"
     },
@@ -79,9 +85,6 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
     },
     "users": {
       ".write": "auth.uid != null"
-    },
-    "usersByPhotoLiked": {
-      ".write": "auth.uid === 'wolverine'"
     }
   }
 }
