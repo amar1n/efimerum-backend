@@ -61,16 +61,18 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
 
  Este endpoint realiza las siguientes acciones...
  0) Validamos que se reciben los query acordados
- 1) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
- 2) Obtenemos la referencia a la foto de uso exclusivo del Backend
- 3) Generamos los nodos para los likes en la BBDD de Firebase
- 4) Propagamos el like en la foto de uso exclusivo del Backend
- 5) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
+ 1) Obtenemos la referencia a la foto de uso exclusivo del Backend
+ 2) Validamos que el dueño de la foto no emite un like
+ 3) Validamos que un mismo usuario no emite más de un like
+ 4) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
+ 5) Generamos los nodos para los likes en la BBDD de Firebase
+ 6) Propagamos el like en la foto de uso exclusivo del Backend
+ 7) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
  - photosByLabel
  - photosPostedByUser
  - photosLikedByUser
- 6) Persistimos en la BBDD de Firebase los nodos generados
- 7) Persistimos en la BBDD de Firebase la info de GeoFire
+ 8) Persistimos en la BBDD de Firebase los nodos generados
+ 9) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), function (req, res) {
     var validReqQuery = [
@@ -93,37 +95,57 @@ router.post('/', firebaseAuth(), function (req, res) {
         }
     }
 
-    // 1) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
+    // 1) Obtenemos la referencia a la foto de uso exclusivo del Backend
     var photoKey = req.query.photoKey;
-    var photoRef = rootRef.child(nodePhotos + '/' + photoKey);
-    photoRef.transaction(function (currentData) {
-        if (currentData != null) {
-            currentData.numOfLikes = currentData.numOfLikes + 1;
-            currentData.expirationDate = moment.unix(currentData.expirationDate).add(30, 'minutes').unix();
-            return currentData;
-        } else {
-            return 0;
-        }
-    }, function (error, committed, snapshot) {
-        if (error) {
-            return res.status(500).json({
-                success: false,
-                error: 'Transaction failed abnormally! ' + error.message
-            });
-        } else if (!committed) {
-            return res.status(500).json({success: false, error: 'Transaction aborted!'});
-        } else {
-            var foto = snapshot.val();
+    var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
+    _photoRef.once('value')
+        .then(function (snap) {
+            var _photo = snap.val();
+            var uid = req.uid || 'batman';
 
-            // 2) Obtenemos la referencia a la foto de uso exclusivo del Backend
-            var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
-            _photoRef.once('value')
-                .then(function (snap) {
-                    var _photo = snap.val();
+            // 2) Validamos que el dueño de la foto no emite un like
+            if (_photo.owner === uid) {
+                return res.status(400).json({success: false, error: 'Owners can not make likes to their own photos'});
+            }
+
+            // 3) Validamos que un mismo usuario no emite más de un like
+            var bFlag = false;
+            if (_photo.likes !== undefined) {
+                var likes = Object.keys(_photo.likes);
+                for (var i = 0; i < likes.length; i++) {
+                    if (_photo.likes[likes[i]].userId === uid) {
+                        bFlag = true;
+                        break;
+                    }
+                }
+            }
+            if (bFlag) {
+                return res.status(400).json({success: false, error: 'Not more than one like per user for each photo'});
+            }
+
+            // 4) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
+            var photoRef = rootRef.child(nodePhotos + '/' + photoKey);
+            photoRef.transaction(function (currentData) {
+                if (currentData != null) {
+                    currentData.numOfLikes = currentData.numOfLikes + 1;
+                    currentData.expirationDate = moment.unix(currentData.expirationDate).add(30, 'minutes').unix();
+                    return currentData;
+                } else {
+                    return 0;
+                }
+            }, function (error, committed, snapshot) {
+                if (error) {
+                    return res.status(500).json({
+                        success: false,
+                        error: 'Transaction failed abnormally! ' + error.message
+                    });
+                } else if (!committed) {
+                    return res.status(500).json({success: false, error: 'Transaction aborted!'});
+                } else {
+
+                    // 5) Generamos los nodos para los likes en la BBDD de Firebase
+                    var foto = snapshot.val();
                     var updates = {};
-
-                    // 3) Generamos los nodos para los likes en la BBDD de Firebase
-                    var uid = req.uid || 'batman';
                     var latitude = Number(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
                     var longitude = Number(req.query.longitude);
                     var likeKey = rootRef.child(nodeLikes).push().key;
@@ -138,12 +160,12 @@ router.post('/', firebaseAuth(), function (req, res) {
                     updates[nodeLikes + '/' + likeKey] = likeData;
                     updates[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
 
-                    // 4) Propagamos el like en la foto de uso exclusivo del Backend
+                    // 6) Propagamos el like en la foto de uso exclusivo del Backend
                     updates[node_Photos + '/' + photoKey + '/' + 'likes' + '/' + likeKey] = likeData;
                     updates[node_Photos + '/' + photoKey + '/' + 'numOfLikes'] = foto.numOfLikes;
                     updates[node_Photos + '/' + photoKey + '/' + 'expirationDate'] = foto.expirationDate;
 
-                    // 5) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
+                    // 7) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
                     //      - photosByLabel
                     //      - photosPostedByUser
                     //      - photosLikedByUser
@@ -158,11 +180,11 @@ router.post('/', firebaseAuth(), function (req, res) {
                         });
                     }
 
-                    // 6) Persistimos en la BBDD de Firebase los nodos generados
+                    // 8) Persistimos en la BBDD de Firebase los nodos generados
                     rootRef.update(updates)
                         .then(function () {
 
-                            // 7) Persistimos en la BBDD de Firebase la info de GeoFire
+                            // 9) Persistimos en la BBDD de Firebase la info de GeoFire
                             geoFire.set(likeKey, [latitude, longitude]).then(function () {
                                 return res.status(200).json({success: true, data: likeKey});
                             }).catch(function (error) {
@@ -176,16 +198,16 @@ router.post('/', firebaseAuth(), function (req, res) {
                         .catch(function (error) {
                             return res.status(500).json({success: false, error: error});
                         });
-                })
-                .catch(function (error) {
-                    console.log(".............Read once in _photos Error: " + error, '....with photoKey:', photoKey);
-                    return res.status(500).json({
-                        success: false,
-                        error: 'Photo updated without propagation!'
-                    });
-                });
-        }
-    });
+                }
+            });
+        })
+        .catch(function (error) {
+            console.log(".............Read once in _photos Error: " + error, '....with photoKey:', photoKey);
+            return res.status(500).json({
+                success: false,
+                error: 'Photo updated without propagation!'
+            });
+        });
 });
 
 // --------------------------------------
