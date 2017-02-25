@@ -6,12 +6,20 @@ router.get('/', function(req, res, next) {
     res.render('index', { title: 'Express' });
 });
 
-router.get('/addPhoto', function(req, res, next) {
-    res.render('addPhoto');
+router.get('/v1/addPhoto', function(req, res, next) {
+    res.render('v1/addPhoto');
 });
 
-router.get('/addLike', function(req, res, next) {
-    res.render('addLike');
+router.get('/v1/addLike', function(req, res, next) {
+    res.render('v1/addLike');
+});
+
+router.get('/v1/addFavoriteLabel', function(req, res, next) {
+    res.render('v1/addFavoriteLabel');
+});
+
+router.get('/v1/deleteFavoriteLabel', function(req, res, next) {
+    res.render('v1/deleteFavoriteLabel');
 });
 
 module.exports = router;

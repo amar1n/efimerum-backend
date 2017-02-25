@@ -7,7 +7,7 @@
     "cluster": "node ./bin/www_cluster"
   },
   "dependencies": {
-    "@google-cloud/storage": "^0.6.1",
+    "@google-cloud/storage": "^0.7.0",
     "@google-cloud/translate": "^0.7.0",
     "@google-cloud/vision": "^0.8.0",
     "body-parser": "~1.13.2",
