@@ -20,6 +20,7 @@ var sha1 = require('sha1');
 var sha256 = require('sha256');
 var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
+var logError = require('./../../../lib/utils').logError;
 
 const node_Photos = '_photos';
 const nodePhotos = 'photos';
@@ -106,6 +107,7 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
             }
         }
         if (!bFlag) {
+            logError('POST photos', 'Wrong API call (query)');
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
@@ -135,8 +137,8 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
             detections.safeSearch.spoof == 'LIKELY' || detections.safeSearch.spoof == 'VERY_LIKELY' ||
             detections.safeSearch.medical == 'LIKELY' || detections.safeSearch.medical == 'VERY_LIKELY' ||
             detections.safeSearch.violence == 'LIKELY' || detections.safeSearch.violence == 'VERY_LIKELY') {
-            console.log('Inappropriate content');
             fs.unlinkSync(photoPath);
+            logError('POST photos', 'Inappropriate content');
             return res.status(500).json({success: false, error: 'Inappropriate content'});
         }
 
@@ -238,7 +240,7 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
                                 geoFire.set(photoKey, [latitude, longitude]).then(function () {
                                     return res.status(200).json({success: true, data: photoKey});
                                 }).catch(function (error) {
-                                    console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey);
+                                    logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
                                     return res.status(500).json({
                                         success: false,
                                         error: 'Photo added without GeoFire info!'

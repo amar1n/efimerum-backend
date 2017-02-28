@@ -7,6 +7,7 @@ var router = express.Router();
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
+var logError = require('./../../../lib/utils').logError;
 
 const nodeLabels = 'labels';
 const nodeFavoriteLabelsByUser = 'favoriteLabelsByUser';
@@ -60,6 +61,7 @@ router.post('/', firebaseAuth(), function (req, res) {
             }
         }
         if (!bFlag) {
+            logError('POST favoriteLabel', 'Wrong API call (query)');
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
@@ -69,9 +71,11 @@ router.post('/', firebaseAuth(), function (req, res) {
     var validLanguages = [languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
+            logError('POST favoriteLabel', 'Wrong API call (wrong language)');
             return res.status(400).json({success: false, error: 'Wrong API call (wrong language)'});
         }
     } else {
+        logError('POST favoriteLabel', 'Wrong API call (language)');
         return res.status(400).json({success: false, error: 'Wrong API call (language)'});
     }
 
@@ -81,6 +85,7 @@ router.post('/', firebaseAuth(), function (req, res) {
     labelsRef.once('value')
         .then(function (snap) {
             if (snap.val() == null) {
+                logError('POST favoriteLabel', 'Wrong API call (wrong label)');
                 return res.status(400).json({success: false, error: 'Wrong API call (wrong label)'});
             }
 
@@ -140,8 +145,6 @@ router.delete('/', firebaseAuth(), function (req, res) {
         'lang',
         'label'];
 
-    console.log('.................delete');
-
     // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
     for (var i = 0; i < validReqQuery.length; i++) {
@@ -153,6 +156,7 @@ router.delete('/', firebaseAuth(), function (req, res) {
             }
         }
         if (!bFlag) {
+            logError('DELETE favoriteLabel', 'Wrong API call (query)');
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
@@ -162,9 +166,11 @@ router.delete('/', firebaseAuth(), function (req, res) {
     var validLanguages = [languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
+            logError('DELETE favoriteLabel', 'Wrong API call (wrong language)');
             return res.status(400).json({success: false, error: 'Wrong API call (wrong language)'});
         }
     } else {
+        logError('DELETE favoriteLabel', 'Wrong API call (language)');
         return res.status(400).json({success: false, error: 'Wrong API call (language)'});
     }
 
@@ -179,6 +185,7 @@ router.delete('/', firebaseAuth(), function (req, res) {
             return res.status(200).json({success: true});
         })
         .catch(function (error) {
+            logError('DELETE favoriteLabel', 'Error: ' + error);
             return res.status(500).json({success: false, error: error});
         });
 });

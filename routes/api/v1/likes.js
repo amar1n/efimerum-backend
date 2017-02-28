@@ -8,6 +8,8 @@ var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var moment = require('moment');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
+var logInfo = require('./../../../lib/utils').logInfo;
+var logError = require('./../../../lib/utils').logError;
 
 const node_Photos = '_photos';
 const nodePhotos = 'photos';
@@ -80,6 +82,8 @@ router.post('/', firebaseAuth(), function (req, res) {
         'latitude',
         'longitude'];
 
+    logInfo('AMG', 'test');
+
     // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
     for (var i = 0; i < validReqQuery.length; i++) {
@@ -91,6 +95,7 @@ router.post('/', firebaseAuth(), function (req, res) {
             }
         }
         if (!bFlag) {
+            logError('POST likes', 'Wrong API call (query)');
             return res.status(400).json({success: false, error: 'Wrong API call (query)'});
         }
     }
@@ -105,6 +110,7 @@ router.post('/', firebaseAuth(), function (req, res) {
 
             // 2) Validamos que el dueño de la foto no emite un like
             if (_photo.owner === uid) {
+                logError('POST likes', 'Owners can not make likes to their own photos');
                 return res.status(400).json({success: false, error: 'Owners can not make likes to their own photos'});
             }
 
@@ -120,6 +126,7 @@ router.post('/', firebaseAuth(), function (req, res) {
                 }
             }
             if (bFlag) {
+                logError('POST likes', 'Not more than one like per user for each photo');
                 return res.status(400).json({success: false, error: 'Not more than one like per user for each photo'});
             }
 
@@ -135,11 +142,13 @@ router.post('/', firebaseAuth(), function (req, res) {
                 }
             }, function (error, committed, snapshot) {
                 if (error) {
+                    logError('POST likes', 'Transaction failed abnormally! ' + error);
                     return res.status(500).json({
                         success: false,
-                        error: 'Transaction failed abnormally! ' + error.message
+                        error: 'Transaction failed abnormally! ' + error
                     });
                 } else if (!committed) {
+                    logError('POST likes', 'Transaction aborted!');
                     return res.status(500).json({success: false, error: 'Transaction aborted!'});
                 } else {
 
@@ -188,7 +197,7 @@ router.post('/', firebaseAuth(), function (req, res) {
                             geoFire.set(likeKey, [latitude, longitude]).then(function () {
                                 return res.status(200).json({success: true, data: likeKey});
                             }).catch(function (error) {
-                                console.log(".............GeoFire Error: " + error, '....with photoKey:', photoKey, '....with likeKey:', likeKey);
+                                logError('POST likes', '.............GeoFire ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + error);
                                 return res.status(500).json({
                                     success: false,
                                     error: 'Like added without GeoFire info!'
@@ -196,16 +205,17 @@ router.post('/', firebaseAuth(), function (req, res) {
                             });
                         })
                         .catch(function (error) {
+                            logError('POST likes', 'Error updating the database: ' + error);
                             return res.status(500).json({success: false, error: error});
                         });
                 }
             });
         })
         .catch(function (error) {
-            console.log(".............Read once in _photos Error: " + error, '....with photoKey:', photoKey);
+            logError('POST likes', '.............Read once in _photos with photoKey: ' + photoKey + ' ....Error: ' + error);
             return res.status(500).json({
                 success: false,
-                error: 'Photo updated without propagation!'
+                error: error
             });
         });
 });
