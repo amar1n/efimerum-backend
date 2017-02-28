@@ -82,8 +82,6 @@ router.post('/', firebaseAuth(), function (req, res) {
         'latitude',
         'longitude'];
 
-    logInfo('AMG', 'test');
-
     // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
     for (var i = 0; i < validReqQuery.length; i++) {
