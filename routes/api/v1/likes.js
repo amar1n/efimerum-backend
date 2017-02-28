@@ -176,9 +176,11 @@ router.post('/', firebaseAuth(), function (req, res) {
                     //      - photosByLabel
                     //      - photosPostedByUser
                     //      - photosLikedByUser
-                    Object.keys(foto.labels[languageEN]).forEach(function (label) {
-                        updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = foto;
-                    });
+                    if (foto.labels !== undefined) {
+                        Object.keys(foto.labels[languageEN]).forEach(function (label) {
+                            updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = foto;
+                        });
+                    }
                     updates[nodePhotosPostedByUser + '/' + foto.owner + '/' + photoKey] = foto;
                     updates[nodePhotosLikedByUser + '/' + uid + '/' + photoKey] = foto;
                     if (_photo.likes !== undefined) {
