@@ -127,10 +127,8 @@ router.post('/', firebaseAuth(), multer.any(), function (req, res) {
     };
     vision.detect(photoPath, options, function (err, detections, apiResponse) {
         if (err) {
-            processErrorInPostPhoto(err, 'Cloud Vision Error', fotosBucket,
-                photoPath, photoFilename, true, false,
-                null, null, false, false);
-            return res.status(500).json({success: false, error: 'Cloud Vision Error'});
+            logError('POST photos', 'Cloud Vision Error with uid: ' + uid + ', Error: ' + err);
+            detections = {labels: [{desc: 'Who knows...', score: 100}]};
         }
 
         if (detections.safeSearch.adult == 'LIKELY' || detections.safeSearch.adult == 'VERY_LIKELY' ||
