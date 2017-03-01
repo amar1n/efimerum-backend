@@ -8,8 +8,8 @@ var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var moment = require('moment');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
-var logInfo = require('./../../../lib/utils').logInfo;
 var logError = require('./../../../lib/utils').logError;
+var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 
 const node_Photos = '_photos';
 const nodePhotos = 'photos';
@@ -36,7 +36,16 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
- * https://efimerum-48618.appspot.com/api/v1/likes?idToken=XXyXX&photoKey=-KcwxqctGBzxhzI5zJfH&latitude=41.375395&longitude=2.170624
+ * https://efimerum-48618.appspot.com/api/v1/likes
+ *
+ *     body:
+ *     {
+ *       "idToken": "XXyXX",
+ *       "photoKey": "-KcwxqctGBzxhzI5zJfH",
+ *       "latitude": 41.375395,
+ *       "longitude": 2.170624
+ *     }
+ *
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -62,7 +71,7 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  - photosPostedByUser: Propaga la actualización de la foto
 
  Este endpoint realiza las siguientes acciones...
- 0) Validamos que se reciben los query acordados
+ 0) Validamos que se reciben los parámetros acordados
  1) Obtenemos la referencia a la foto de uso exclusivo del Backend
  2) Validamos que el dueño de la foto no emite un like
  3) Validamos que un mismo usuario no emite más de un like
@@ -77,29 +86,21 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  9) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), function (req, res) {
-    var validReqQuery = [
+    var validReqBody = [
         'photoKey',
         'latitude',
         'longitude'];
 
-    // 0) Validamos que se reciben los query acordados
-    var queryKeys = Object.keys(req.query);
-    for (var i = 0; i < validReqQuery.length; i++) {
-        var bFlag = false;
-        for (var j = 0; j < queryKeys.length; j++) {
-            if (validReqQuery[i] === queryKeys[j]) {
-                bFlag = true;
-                break;
-            }
-        }
-        if (!bFlag) {
-            logError('POST likes', 'Wrong API call (query)');
-            return res.status(400).json({success: false, error: 'Wrong API call (query)'});
-        }
+    // 0) Validamos que se reciben los parámetros acordados
+    var bodyKeys = Object.keys(req.body);
+    var bFlag = validateReqDataKeys(validReqBody, bodyKeys);
+    if (!bFlag) {
+        logError('POST likes', 'Wrong API call (query)');
+        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
     }
 
     // 1) Obtenemos la referencia a la foto de uso exclusivo del Backend
-    var photoKey = req.query.photoKey;
+    var photoKey = req.body.photoKey;
     var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
     _photoRef.once('value')
         .then(function (snap) {
@@ -153,8 +154,8 @@ router.post('/', firebaseAuth(), function (req, res) {
                     // 5) Generamos los nodos para los likes en la BBDD de Firebase
                     var foto = snapshot.val();
                     var updates = {};
-                    var latitude = Number(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
-                    var longitude = Number(req.query.longitude);
+                    var latitude = Number(req.body.latitude); // TODO: qué se hace si no viene info de geolocalización???
+                    var longitude = Number(req.body.longitude);
                     var likeKey = rootRef.child(nodeLikes).push().key;
                     var now = moment();
                     var likeData = {

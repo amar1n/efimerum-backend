@@ -8,6 +8,7 @@ var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
+var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 
 const nodeLabels = 'labels';
 const nodeFavoriteLabelsByUser = 'favoriteLabelsByUser';
@@ -17,12 +18,21 @@ const languageEN = 'EN';
  * @api {post} /favoriteLabels
  * @apiGroup Favorite labels
  * @apiDescription Post a favorite labels of a user
+ * @apiParam {String} idToken User's ID token
  * @apiParam {String} lang The language of the label
  * @apiParam {String} label The label
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
- * https://efimerum-48618.appspot.com/api/v1/favoriteLabels?lang=EN
+ * https://efimerum-48618.appspot.com/api/v1/favoriteLabels
+ *
+ *     body:
+ *     {
+ *       "idToken": "XXyXX",
+ *       "lang": "EN",
+ *       "label": "line art"
+ *     }
+ *
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -40,34 +50,26 @@ const languageEN = 'EN';
  - nodeFavoriteLabelsByUser
 
  Este endpoint realiza las siguientes acciones...
- 0) Validamos que se reciben los query acordados
+ 0) Validamos que se reciben los parámetros acordados
  1) Validamos el idioma indicado
  2) Validamos la etiqueta indicada
  3) Persistimos en la BBDD de Firebase todos los nodos generados
  */
 router.post('/', firebaseAuth(), function (req, res) {
-    var validReqQuery = [
+    var validReqBody = [
         'lang',
         'label'];
 
-    // 0) Validamos que se reciben los query acordados
-    var queryKeys = Object.keys(req.query);
-    for (var i = 0; i < validReqQuery.length; i++) {
-        var bFlag = false;
-        for (var j = 0; j < queryKeys.length; j++) {
-            if (validReqQuery[i] === queryKeys[j]) {
-                bFlag = true;
-                break;
-            }
-        }
-        if (!bFlag) {
-            logError('POST favoriteLabel', 'Wrong API call (query)');
-            return res.status(400).json({success: false, error: 'Wrong API call (query)'});
-        }
+    // 0) Validamos que se reciben los parámetros acordados
+    var bodyKeys = Object.keys(req.body);
+    var bFlag = validateReqDataKeys(validReqBody, bodyKeys);
+    if (!bFlag) {
+        logError('POST favoriteLabel', 'Wrong API call (query)');
+        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
     }
 
     // 1) Validamos el idioma indicado
-    var lang = req.query.lang;
+    var lang = req.body.lang;
     var validLanguages = [languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
@@ -80,7 +82,7 @@ router.post('/', firebaseAuth(), function (req, res) {
     }
 
     // 2) Validamos la etiqueta indicada
-    var label = req.query.label;
+    var label = req.body.label;
     var labelsRef = rootRef.child(nodeLabels + '/' + lang + '/' + label);
     labelsRef.once('value')
         .then(function (snap) {
@@ -112,12 +114,13 @@ router.post('/', firebaseAuth(), function (req, res) {
  * @api {delete} /favoriteLabels
  * @apiGroup Favorite labels
  * @apiDescription Delete a favorite label of a user
+ * @apiParam {String} idToken User's ID token
  * @apiParam {String} lang The language of the label
  * @apiParam {String} label The label
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
- * https://efimerum-48618.appspot.com/api/v1/favoriteLabels?lang=EN
+ * https://efimerum-48618.appspot.com/api/v1/favoriteLabels?idToken=XXyXX&label=beach&lang=EN
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -147,18 +150,10 @@ router.delete('/', firebaseAuth(), function (req, res) {
 
     // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
-    for (var i = 0; i < validReqQuery.length; i++) {
-        var bFlag = false;
-        for (var j = 0; j < queryKeys.length; j++) {
-            if (validReqQuery[i] === queryKeys[j]) {
-                bFlag = true;
-                break;
-            }
-        }
-        if (!bFlag) {
-            logError('DELETE favoriteLabel', 'Wrong API call (query)');
-            return res.status(400).json({success: false, error: 'Wrong API call (query)'});
-        }
+    var bFlag = validateReqDataKeys(validReqQuery, queryKeys);
+    if (!bFlag) {
+        logError('DELETE favoriteLabel', 'Wrong API call (query)');
+        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
     }
 
     // 1) Validamos el idioma indicado

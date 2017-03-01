@@ -4,6 +4,8 @@ var debug = require('debug')('efimerum:clean');
 var express = require('express');
 var router = express.Router();
 
+var firebaseAuth = require('../../../lib/firebaseAuth.js');
+
 var pp = require('./../../../lib/utils').processPhotos;
 
 /**
@@ -12,6 +14,12 @@ var pp = require('./../../../lib/utils').processPhotos;
  * @apiDescription Process all photos to remove expired
  * @apiExample Example of use:
  * https://efimerum-48618.appspot.com/api/v1/clean
+ *
+ *     body:
+ *     {
+ *       "idToken": "XXyXX"
+ *     }
+ *
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -25,7 +33,7 @@ var pp = require('./../../../lib/utils').processPhotos;
  *    "error": "..."
  *  }
  */
-router.get('/', function (req, res) {
+router.get('/', firebaseAuth(), function (req, res) {
     pp();
     return res.status(200).json({success: true, data: 'Proceso de limieza lanzado!!!'});
     // var interval = setInterval(pp, 60000);

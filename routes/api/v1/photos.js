@@ -21,6 +21,7 @@ var sha256 = require('sha256');
 var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
+var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 
 const node_Photos = '_photos';
 const nodePhotos = 'photos';
@@ -58,7 +59,15 @@ router.get('/json', function (req, res) {
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
- * https://efimerum-48618.appspot.com/api/v1/photos?idToken=XXyXX&latitude=41.375395&longitude=2.170624
+ * https://efimerum-48618.appspot.com/api/v1/photos
+ *
+ *     body:
+ *     {
+ *       "idToken": "XXyXX",
+ *       "latitude": 41.375395,
+ *       "longitude": 2.170624
+ *     }
+ *
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -81,7 +90,7 @@ router.get('/json', function (req, res) {
  - photosPostedByUser: Relaciona la foto con el usuario que la creo, para que los dispositivos puedan mostrar las fotos subidas por usuario
 
  Este endpoint realiza las siguientes acciones...
- 0) Validamos que se reciben los query acordados
+ 0) Validamos que se reciben los parámetros acordados
  1) Realizamos el SafeSearch y la detección de etiquetas
  2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
  3) Subimos la imagen al storage
@@ -91,30 +100,22 @@ router.get('/json', function (req, res) {
  7) Persistimos en la BBDD de Firebase todos los nodos generados
  8) Persistimos en la BBDD de Firebase la info de GeoFire
  */
-router.post('/', firebaseAuth(), multer.any(), function (req, res) {
-    var validReqQuery = [
+router.post('/', multer.any(), firebaseAuth(), function (req, res) {
+    var validReqBody = [
         'latitude',
         'longitude'];
 
-    // 0) Validamos que se reciben los query acordados
-    var queryKeys = Object.keys(req.query);
-    for (var i = 0; i < validReqQuery.length; i++) {
-        var bFlag = false;
-        for (var j = 0; j < queryKeys.length; j++) {
-            if (validReqQuery[i] === queryKeys[j]) {
-                bFlag = true;
-                break;
-            }
-        }
-        if (!bFlag) {
-            logError('POST photos', 'Wrong API call (query)');
-            return res.status(400).json({success: false, error: 'Wrong API call (query)'});
-        }
+    // 0) Validamos que se reciben los parámetros acordados
+    var bodyKeys = Object.keys(req.body);
+    var bFlag = validateReqDataKeys(validReqBody, bodyKeys);
+    if (!bFlag) {
+        logError('POST photos', 'Wrong API call (query)');
+        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
     }
 
     var uid = req.uid || 'batman';
-    var latitude = Number(req.query.latitude); // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = Number(req.query.longitude);
+    var latitude = Number(req.body.latitude); // TODO: qué se hace si no viene info de geolocalización???
+    var longitude = Number(req.body.longitude);
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(efimerumStorageBucket);

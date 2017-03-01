@@ -7,6 +7,7 @@ var router = express.Router();
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
+var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 
 const nodeLabels = 'labels';
 const languageEN = 'EN';
@@ -15,11 +16,19 @@ const languageEN = 'EN';
  * @api {get} /labels
  * @apiGroup Labels
  * @apiDescription Retrieve the list of labels
+ * @apiParam {String} idToken User's ID token
  * @apiParam {String} [lang] The language required
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
- * https://efimerum-48618.appspot.com/api/v1/labels?lang=EN
+ * https://efimerum-48618.appspot.com/api/v1/labels
+ *
+ *     body:
+ *     {
+ *       "idToken": "XXyXX",
+ *       "lang": "EN"
+ *     }
+ *
  * @apiSuccessExample
  * HTTP/1.1 200 OK
  * {
@@ -56,17 +65,10 @@ router.get('/', firebaseAuth(), function (req, res) {
 
     // 0) Validamos que se reciben los query acordados
     var queryKeys = Object.keys(req.query);
-    for (var i = 0; i < validReqQuery.length; i++) {
-        var bFlag = false;
-        for (var j = 0; j < queryKeys.length; j++) {
-            if (validReqQuery[i] === queryKeys[j]) {
-                bFlag = true;
-                break;
-            }
-        }
-        if (!bFlag) {
-            return res.status(400).json({success: false, error: 'Wrong API call (query)'});
-        }
+    var bFlag = validateReqDataKeys(validReqQuery, queryKeys);
+    if (!bFlag) {
+        logError('GET labels', 'Wrong API call (query)');
+        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
     }
 
     // 1) Validamos el idioma solicitado

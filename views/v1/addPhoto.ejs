@@ -1,8 +1,12 @@
 <html>
-    <body>
-        <form action="/api/v1/photos?latitude=41.375395&longitude=2.170624&uid=CCq864Wku8damv2C5TaZs4s5cpz2&test=true" method="post" enctype="multipart/form-data">
-            <input type="file" name="photoImg" />
-            <input type="submit" name="submit" value="submit" />
-        </form>
-    </body>
+<body>
+<form action="/api/v1/photos" method="post" enctype="multipart/form-data">
+    <input type="file" name="photoImg"/><br/>
+    latitude: <input type="text" name="latitude" value="10.4091034"/><br/>
+    longitude: <input type="text" name="longitude" value="-66.8839834"/><br/>
+    uid: <input type="text" name="uid" value="CCq864Wku8damv2C5TaZs4s5cpz2"/><br/>
+    test: <input type="text" name="test" value="true"/><br/>
+    <input type="submit" name="submit" value="submit"/>
+</form>
+</body>
 </html>
