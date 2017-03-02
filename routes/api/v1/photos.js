@@ -167,7 +167,6 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                 saveToDisk: false
             };
             thumbnailsCreator.createThumbnail(photoPath, {
-                maxWidth: 300,
                 maxHeight: 300
             }, options).then(function (resp) {
                 var photoSplitedByDot = photoPath.split('.');
