@@ -21,7 +21,6 @@ var sha256 = require('sha256');
 var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
-var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 
 const node_Photos = '_photos';
 const nodePhotos = 'photos';
@@ -54,8 +53,8 @@ router.get('/json', function (req, res) {
  * @apiDescription Post a single photo using a form multipart (multipart/form-data). Only jpeg and png are accepted.
  * @apiSuccess {String} data The photo key
  * @apiParam {String} idToken User's ID token
- * @apiParam {Number} latitude The latitude of the user performing the action
- * @apiParam {Number} longitude The latitude of the user performing the action
+ * @apiParam {Number} [latitude] The latitude of the user performing the action
+ * @apiParam {Number} [longitude] The latitude of the user performing the action
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
@@ -90,37 +89,35 @@ router.get('/json', function (req, res) {
  - photosPostedByUser: Relaciona la foto con el usuario que la creo, para que los dispositivos puedan mostrar las fotos subidas por usuario
 
  Este endpoint realiza las siguientes acciones...
- 0) Validamos que se reciben los parámetros acordados
- 1) Realizamos el SafeSearch y la detección de etiquetas
- 2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
- 3) Subimos la imagen al storage
- 4) Creamos el thumbnail de la imagen
- 5) Subimos el thumbnail de la imagen al storage
- 6) Generamos los nodos en la BBDD de Firebase
- 7) Persistimos en la BBDD de Firebase todos los nodos generados
- 8) Persistimos en la BBDD de Firebase la info de GeoFire
+ 1) Procesamos las coordenadas... si se reciben
+ 2) Realizamos el SafeSearch y la detección de etiquetas
+ 3) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
+ 4) Subimos la imagen al storage
+ 5) Creamos el thumbnail de la imagen
+ 6) Subimos el thumbnail de la imagen al storage
+ 7) Generamos los nodos en la BBDD de Firebase
+ 8) Persistimos en la BBDD de Firebase todos los nodos generados
+ 9) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', multer.any(), firebaseAuth(), function (req, res) {
-    var validReqBody = [
-        'latitude',
-        'longitude'];
-
-    // 0) Validamos que se reciben los parámetros acordados
-    var bodyKeys = Object.keys(req.body);
-    var bFlag = validateReqDataKeys(validReqBody, bodyKeys);
-    if (!bFlag) {
-        logError('POST photos', 'Wrong API call (query)');
-        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
-    }
-
     var uid = req.uid || 'batman';
-    var latitude = Number(req.body.latitude); // TODO: qué se hace si no viene info de geolocalización???
-    var longitude = Number(req.body.longitude);
+
+    // 1) Procesamos las coordenadas... si se reciben
+    var bFlagCoordinates = false;
+    var bodyLatitude = req.body.latitude;
+    var bodyLongitude = req.body.longitude;
+    var latitude = 0;
+    var longitude = 0;
+    if (typeof bodyLatitude !== 'undefined' && typeof bodyLongitude !== 'undefined') {
+        bFlagCoordinates = true;
+        latitude = Number(bodyLatitude);
+        longitude = Number(bodyLongitude);
+    }
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(efimerumStorageBucket);
 
-    // 1) Realizamos el SafeSearch y la detección de etiquetas
+    // 2) Realizamos el SafeSearch y la detección de etiquetas
     var options = {
         maxResults: 100,
         types: ['labels', 'safeSearch'],
@@ -141,7 +138,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
             return res.status(500).json({success: false, error: 'Inappropriate content'});
         }
 
-        // 2) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
+        // 3) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
         var labels = {};
         var labelsEN = {};
         var updates = {};
@@ -153,7 +150,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
         });
         labels[languageEN] = labelsEN;
 
-        // 3) Subimos la imagen al storage
+        // 4) Subimos la imagen al storage
         fotosBucket.upload(photoPath, function (err, file) {
             if (err) {
                 processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket,
@@ -162,7 +159,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                 return res.status(500).json({success: false, error: err});
             }
 
-            // 4) Creamos el thumbnail de la imagen
+            // 5) Creamos el thumbnail de la imagen
             var options = {
                 saveToDisk: false
             };
@@ -180,7 +177,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             thumbnailPath, null, true, false);
                         return res.status(500).json({success: false, error: err});
                     }
-                    // 5) Subimos el thumbnail de la imagen al storage
+                    // 6) Subimos el thumbnail de la imagen al storage
                     fotosBucket.upload(thumbnailPath, function (err, file) {
                         if (err) {
                             processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
@@ -189,7 +186,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             return res.status(500).json({success: false, error: err});
                         }
 
-                        // 6) Generamos los nodos en la BBDD de Firebase
+                        // 7) Generamos los nodos en la BBDD de Firebase
                         var photoKey = rootRef.child(nodePhotos).push().key;
                         var imageData = {};
                         imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
@@ -211,8 +208,6 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             labels: labels,
                             imageData: imageData,
                             thumbnailData: thumbnailData,
-                            latitude: latitude,
-                            longitude: longitude,
                             numOfLikes: 0,
                             owner: uid,
                             md5: md5(photoFilename),
@@ -221,6 +216,11 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             randomString: randomstring.generate()
                         };
 
+                        if (bFlagCoordinates) {
+                            photoData.latitude = latitude;
+                            photoData.longitude = longitude;
+                        }
+
                         updates[nodePhotos + '/' + photoKey] = photoData;
                         Object.keys(labelsEN).forEach(function (label) {
                             updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
@@ -228,22 +228,26 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                         updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
                         updates[node_Photos + '/' + photoKey] = photoData;
 
-                        // 7) Persistimos en la BBDD de Firebase todos los nodos generados
+                        // 8) Persistimos en la BBDD de Firebase todos los nodos generados
                         rootRef.update(updates)
                             .then(function () {
                                 fs.unlinkSync(photoPath);
                                 fs.unlinkSync(thumbnailPath);
 
-                                // 8) Persistimos en la BBDD de Firebase la info de GeoFire
-                                geoFire.set(photoKey, [latitude, longitude]).then(function () {
-                                    return res.status(200).json({success: true, data: photoKey});
-                                }).catch(function (error) {
-                                    logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
-                                    return res.status(500).json({
-                                        success: false,
-                                        error: 'Photo added without GeoFire info!'
+                                // 9) Persistimos en la BBDD de Firebase la info de GeoFire
+                                if (bFlagCoordinates) {
+                                    geoFire.set(photoKey, [latitude, longitude]).then(function () {
+                                        return res.status(200).json({success: true, data: photoKey});
+                                    }).catch(function (error) {
+                                        logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
+                                        return res.status(500).json({
+                                            success: false,
+                                            error: 'Photo added without GeoFire info!'
+                                        });
                                     });
-                                });
+                                } else {
+                                    return res.status(200).json({success: true, data: photoKey});
+                                }
                             })
                             .catch(function (error) {
                                 processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,

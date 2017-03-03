@@ -31,8 +31,8 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  * @apiSuccess {String} data The like key
  * @apiParam {String} idToken User's ID token
  * @apiParam {Number} photoKey Photo identifier
- * @apiParam {Number} latitude The latitude of the user performing the action
- * @apiParam {Number} longitude The longitude of the user performing the action
+ * @apiParam {Number} [latitude] The latitude of the user performing the action
+ * @apiParam {Number} [longitude] The longitude of the user performing the action
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
@@ -76,20 +76,19 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  2) Validamos que el dueño de la foto no emite un like
  3) Validamos que un mismo usuario no emite más de un like
  4) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
- 5) Generamos los nodos para los likes en la BBDD de Firebase
- 6) Propagamos el like en la foto de uso exclusivo del Backend
- 7) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
+ 5) Procesamos las coordenadas... si se reciben
+ 6) Generamos los nodos para los likes en la BBDD de Firebase
+ 7) Propagamos el like en la foto de uso exclusivo del Backend
+ 8) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
  - photosByLabel
  - photosPostedByUser
  - photosLikedByUser
- 8) Persistimos en la BBDD de Firebase los nodos generados
- 9) Persistimos en la BBDD de Firebase la info de GeoFire
+ 9) Persistimos en la BBDD de Firebase los nodos generados
+ 10) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), function (req, res) {
     var validReqBody = [
-        'photoKey',
-        'latitude',
-        'longitude'];
+        'photoKey'];
 
     // 0) Validamos que se reciben los parámetros acordados
     var bodyKeys = Object.keys(req.body);
@@ -151,29 +150,43 @@ router.post('/', firebaseAuth(), function (req, res) {
                     return res.status(500).json({success: false, error: 'Transaction aborted!'});
                 } else {
 
-                    // 5) Generamos los nodos para los likes en la BBDD de Firebase
+                    // 5) Procesamos las coordenadas... si se reciben
+                    var bFlagCoordinates = false;
+                    var bodyLatitude = req.body.latitude;
+                    var bodyLongitude = req.body.longitude;
+                    var latitude = 0;
+                    var longitude = 0;
+                    if (typeof bodyLatitude !== 'undefined' && typeof bodyLongitude !== 'undefined') {
+                        bFlagCoordinates = true;
+                        latitude = Number(bodyLatitude);
+                        longitude = Number(bodyLongitude);
+                    }
+
+                    // 6) Generamos los nodos para los likes en la BBDD de Firebase
                     var foto = snapshot.val();
                     var updates = {};
-                    var latitude = Number(req.body.latitude); // TODO: qué se hace si no viene info de geolocalización???
-                    var longitude = Number(req.body.longitude);
                     var likeKey = rootRef.child(nodeLikes).push().key;
                     var now = moment();
                     var likeData = {
                         creationDate: now.unix(),
-                        latitude: latitude,
-                        longitude: longitude,
                         userId: uid,
                         photoKey: photoKey
                     };
+
+                    if (bFlagCoordinates) {
+                        likeData.latitude = latitude;
+                        likeData.longitude = longitude;
+                    }
+
                     updates[nodeLikes + '/' + likeKey] = likeData;
                     updates[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
 
-                    // 6) Propagamos el like en la foto de uso exclusivo del Backend
+                    // 7) Propagamos el like en la foto de uso exclusivo del Backend
                     updates[node_Photos + '/' + photoKey + '/' + 'likes' + '/' + likeKey] = likeData;
                     updates[node_Photos + '/' + photoKey + '/' + 'numOfLikes'] = foto.numOfLikes;
                     updates[node_Photos + '/' + photoKey + '/' + 'expirationDate'] = foto.expirationDate;
 
-                    // 7) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
+                    // 8) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
                     //      - photosByLabel
                     //      - photosPostedByUser
                     //      - photosLikedByUser
@@ -190,20 +203,24 @@ router.post('/', firebaseAuth(), function (req, res) {
                         });
                     }
 
-                    // 8) Persistimos en la BBDD de Firebase los nodos generados
+                    // 9) Persistimos en la BBDD de Firebase los nodos generados
                     rootRef.update(updates)
                         .then(function () {
 
-                            // 9) Persistimos en la BBDD de Firebase la info de GeoFire
-                            geoFire.set(likeKey, [latitude, longitude]).then(function () {
-                                return res.status(200).json({success: true, data: likeKey});
-                            }).catch(function (error) {
-                                logError('POST likes', '.............GeoFire ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + error);
-                                return res.status(500).json({
-                                    success: false,
-                                    error: 'Like added without GeoFire info!'
+                            // 10) Persistimos en la BBDD de Firebase la info de GeoFire
+                            if (bFlagCoordinates) {
+                                geoFire.set(likeKey, [latitude, longitude]).then(function () {
+                                    return res.status(200).json({success: true, data: likeKey});
+                                }).catch(function (error) {
+                                    logError('POST likes', '.............GeoFire ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + error);
+                                    return res.status(500).json({
+                                        success: false,
+                                        error: 'Like added without GeoFire info!'
+                                    });
                                 });
-                            });
+                            } else {
+                                return res.status(200).json({success: true, data: likeKey});
+                            }
                         })
                         .catch(function (error) {
                             logError('POST likes', 'Error updating the database: ' + error);
