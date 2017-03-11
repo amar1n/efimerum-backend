@@ -213,7 +213,6 @@ router.post('/', firebaseAuth(), function (req, res) {
                         .then(function () {
 
                             // 10.a) Enviamos una notificación al dueño de la foto, avisándole que su foto... gusta!!!
-                            console.log('............AMG', nodeUsers + '/' + _photo.owner);
                             var userRef = rootRef.child(nodeUsers + '/' + _photo.owner);
                             userRef.once('value')
                                 .then(function (snap) {

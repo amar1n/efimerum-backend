@@ -30,4 +30,8 @@ router.get('/v1/pushNotification', function(req, res, next) {
     res.render('v1/pushNotification');
 });
 
+router.get('/v1/geofire', function(req, res, next) {
+    res.render('v1/geofire');
+});
+
 module.exports = router;

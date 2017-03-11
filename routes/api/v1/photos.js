@@ -98,6 +98,7 @@ router.get('/json', function (req, res) {
  7) Generamos los nodos en la BBDD de Firebase
  8) Persistimos en la BBDD de Firebase todos los nodos generados
  9) Persistimos en la BBDD de Firebase la info de GeoFire
+ 10) Propagar la info de Geofire a todos los nodos donde está la foto
  */
 router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     var uid = req.uid || 'batman';
@@ -231,13 +232,48 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                         // 8) Persistimos en la BBDD de Firebase todos los nodos generados
                         rootRef.update(updates)
                             .then(function () {
-                                fs.unlinkSync(photoPath);
-                                fs.unlinkSync(thumbnailPath);
+                                fs.unlink(photoPath, function (err) {
+                                    if (err) {
+                                        return logError('POST photos', '.............unlink photoPath: ' + photoPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
+                                    }
+                                });
+                                fs.unlink(thumbnailPath, function (err) {
+                                    if (err) {
+                                        return logError('POST photos', '.............unlink thumbnailPath: ' + thumbnailPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
+                                    }
+                                });
 
                                 // 9) Persistimos en la BBDD de Firebase la info de GeoFire
                                 if (bFlagCoordinates) {
                                     geoFire.set(photoKey, [latitude, longitude]).then(function () {
-                                        return res.status(200).json({success: true, data: photoKey});
+
+                                        // 10) Propagar la info de Geofire a todos los nodos donde está la foto
+                                        var photoGeoRef = rootRef.child(nodeGeoFirePhotos + '/' + photoKey);
+                                        photoGeoRef.once('value')
+                                            .then(function (snap) {
+                                                var photoGeo = snap.val();
+                                                updates = {};
+                                                var keys = Object.keys(photoGeo);
+                                                keys.forEach(function (entry) {
+                                                    updates[nodePhotos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    Object.keys(labelsEN).forEach(function (label) {
+                                                        updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    });
+                                                    updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    updates[node_Photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                });
+                                                rootRef.update(updates)
+                                                    .then(function () {
+                                                        return res.status(200).json({success: true, data: photoKey});
+                                                    })
+                                                    .catch(function (error) {
+                                                        logError('POST photos', '.............GeoFire propagation-update Error: ' + error + '....with photoKey: ' + photoKey);
+                                                        return res.status(500).json({success: false, error: error});
+                                                    });
+                                            })
+                                            .catch(function (error) {
+                                                logError('POST photos', '.............GeoFire propagation Error: ' + error + '....with photoKey: ' + photoKey);
+                                            });
                                     }).catch(function (error) {
                                         logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
                                         return res.status(500).json({
