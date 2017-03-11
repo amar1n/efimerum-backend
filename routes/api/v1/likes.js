@@ -9,7 +9,9 @@ var rootRef = firebase.database().ref();
 var moment = require('moment');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
+var logInfo = require('./../../../lib/utils').logInfo;
 var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
+var pushNotification = require('./../../../lib/googleCloudPlatform').pushNotification;
 
 const node_Photos = '_photos';
 const nodePhotos = 'photos';
@@ -20,6 +22,8 @@ const nodePhotosPostedByUser = 'photosPostedByUser';
 const nodePhotosLikedByUser = 'photosLikedByUser';
 const nodeGeoFireLikes = 'geofireLikes';
 const languageEN = 'EN';
+const nodeUsers = 'users';
+const notificationCode = 'LIKE';
 
 var GeoFire = require('geofire');
 var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
@@ -30,7 +34,7 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  * @apiDescription Post a like in a single photo
  * @apiSuccess {String} data The like key
  * @apiParam {String} idToken User's ID token
- * @apiParam {Number} photoKey Photo identifier
+ * @apiParam {String} photoKey Photo identifier
  * @apiParam {Number} [latitude] The latitude of the user performing the action
  * @apiParam {Number} [longitude] The longitude of the user performing the action
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
@@ -84,7 +88,8 @@ var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
  - photosPostedByUser
  - photosLikedByUser
  9) Persistimos en la BBDD de Firebase los nodos generados
- 10) Persistimos en la BBDD de Firebase la info de GeoFire
+ 10.a) Enviamos una notificación al dueño de la foto, avisándole que su foto... gusta!!!
+ 10.b) Persistimos en la BBDD de Firebase la info de GeoFire
  */
 router.post('/', firebaseAuth(), function (req, res) {
     var validReqBody = [
@@ -207,7 +212,30 @@ router.post('/', firebaseAuth(), function (req, res) {
                     rootRef.update(updates)
                         .then(function () {
 
-                            // 10) Persistimos en la BBDD de Firebase la info de GeoFire
+                            // 10.a) Enviamos una notificación al dueño de la foto, avisándole que su foto... gusta!!!
+                            console.log('............AMG', nodeUsers + '/' + _photo.owner);
+                            var userRef = rootRef.child(nodeUsers + '/' + _photo.owner);
+                            userRef.once('value')
+                                .then(function (snap) {
+                                    var owner = snap.val();
+                                    var fcmToken = owner.fcmToken;
+                                    if (fcmToken === undefined) {
+                                        logError('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: User (' + user.email + ') without FCM Token');
+                                    } else {
+                                        pushNotification(notificationCode, photoKey, fcmToken)
+                                            .then(function (response) {
+                                                logInfo('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Successfully sent with response: ' + response);
+                                            })
+                                            .catch(function (err) {
+                                                logError('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + err);
+                                            });
+                                    }
+                                })
+                                .catch(function (error) {
+                                    logError('POST likes', '.............Read once in users with uuid: ' + _photo.owner + ' ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + error);
+                                });
+
+                            // 10.b) Persistimos en la BBDD de Firebase la info de GeoFire
                             if (bFlagCoordinates) {
                                 geoFire.set(likeKey, [latitude, longitude]).then(function () {
                                     return res.status(200).json({success: true, data: likeKey});

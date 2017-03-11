@@ -26,4 +26,8 @@ router.get('/v1/clean', function(req, res, next) {
     res.render('v1/clean');
 });
 
+router.get('/v1/pushNotification', function(req, res, next) {
+    res.render('v1/pushNotification');
+});
+
 module.exports = router;

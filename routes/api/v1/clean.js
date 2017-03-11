@@ -12,6 +12,10 @@ var pp = require('./../../../lib/utils').processPhotos;
  * @api {get} /clean
  * @apiGroup Clean
  * @apiDescription Process all photos to remove expired
+ * @apiSuccess {String} data A successfull message
+ * @apiParam {String} idToken User's ID token
+ * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
+ * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
  * https://efimerum-48618.appspot.com/api/v1/clean
  *

@@ -31,6 +31,7 @@ app.use('/api/v1/likes', require('./routes/api/v1/likes'));
 app.use('/api/v1/clean', require('./routes/api/v1/clean'));
 app.use('/api/v1/geofire', require('./routes/api/v1/geofire'));
 app.use('/api/v1/favoriteLabel', require('./routes/api/v1/favoriteLabel'));
+app.use('/api/v1/pushNotification', require('./routes/api/v1/pushNotification'));
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
