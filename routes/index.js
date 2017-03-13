@@ -34,4 +34,8 @@ router.get('/v1/geofire', function(req, res, next) {
     res.render('v1/geofire');
 });
 
+router.get('/v1/reportPhoto', function(req, res, next) {
+    res.render('v1/reportPhoto');
+});
+
 module.exports = router;
