@@ -38,17 +38,24 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
     "_photos": {
       "$photo_id": {
         ".write": "auth.uid === 'wolverine'",
-        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
+        ".indexOn": "g"
       }
     },
     "favoriteLabelsByUser": {
       ".write": "auth.uid === 'wolverine'"
     },
     "geofireLikes": {
-      ".write": "auth.uid === 'wolverine'"
+      ".write": "auth.uid === 'wolverine'",
+      "$like_id": {
+        ".indexOn": "g"
+      }
     },
     "geofirePhotos": {
-      ".write": "auth.uid === 'wolverine'"
+      ".write": "auth.uid === 'wolverine'",
+      "$photo_id": {
+        ".indexOn": "g"
+      }
     },
     "labels": {
       ".write": "auth.uid === 'wolverine'"
@@ -60,29 +67,37 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
       ".write": "auth.uid === 'wolverine'"
     },
     "photos": {
-      ".write": "auth.uid === 'wolverine'"
+      ".write": "auth.uid === 'wolverine'",
+      "$photo_id": {
+        ".indexOn": "g"
+      }
     },
     "photosByLabel": {
       "$language": {
         "$label": {
           "$photo_id": {
             ".write": "auth.uid === 'wolverine'",
-            ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+            ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
+            ".indexOn": "g"
           }
         }
       }
     },
     "photosLikedByUser": {
-      "$photo_id": {
-        ".write": "auth.uid === 'wolverine'",
-        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+      "$user_id": {
+        "$photo_id": {
+          ".write": "auth.uid === 'wolverine'",
+          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
+          ".indexOn": "g"
+        }
       }
     },
     "photosPostedByUser": {
       "$user_id": {
         "$photo_id": {
           ".write": "auth.uid === 'wolverine'",
-          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
+          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
+          ".indexOn": "g"
         }
       }
     },
