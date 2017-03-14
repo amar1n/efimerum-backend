@@ -145,8 +145,8 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
         var updates = {};
         detections.labels.forEach(function (label) {
             if (label.score > 75) {
-                labelsEN[label.desc] = true;
-                updates[nodeLabels + '/' + languageEN + '/' + label.desc] = true;
+                labelsEN[label.desc] = label.desc;
+                updates[nodeLabels + '/' + languageEN + '/' + label.desc] = label.desc;
             }
         });
         labels[languageEN] = labelsEN;
