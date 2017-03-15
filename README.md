@@ -38,24 +38,19 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
     "_photos": {
       "$photo_id": {
         ".write": "auth.uid === 'wolverine'",
-        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
-        ".indexOn": "g"
+        ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
       }
     },
     "favoriteLabelsByUser": {
       ".write": "auth.uid === 'wolverine'"
     },
     "geofireLikes": {
-      ".write": "auth.uid === 'wolverine'",
-      "$like_id": {
-        ".indexOn": "g"
-      }
+      ".indexOn": "g",
+      ".write": "auth.uid === 'wolverine'"
     },
     "geofirePhotos": {
-      ".write": "auth.uid === 'wolverine'",
-      "$photo_id": {
-        ".indexOn": "g"
-      }
+      ".indexOn": "g",
+      ".write": "auth.uid === 'wolverine'"
     },
     "labels": {
       ".write": "auth.uid === 'wolverine'"
@@ -67,18 +62,15 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
       ".write": "auth.uid === 'wolverine'"
     },
     "photos": {
-      ".write": "auth.uid === 'wolverine'",
-      "$photo_id": {
-        ".indexOn": "g"
-      }
+      ".indexOn": "g",
+      ".write": "auth.uid === 'wolverine'"
     },
     "photosByLabel": {
       "$language": {
         "$label": {
           "$photo_id": {
             ".write": "auth.uid === 'wolverine'",
-            ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
-            ".indexOn": "g"
+            ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
           }
         }
       }
@@ -87,8 +79,7 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
       "$user_id": {
         "$photo_id": {
           ".write": "auth.uid === 'wolverine'",
-          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
-          ".indexOn": "g"
+          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
         }
       }
     },
@@ -96,8 +87,7 @@ Nota: https://crisp.im/blog/why-you-should-never-use-firebase-realtime-database/
       "$user_id": {
         "$photo_id": {
           ".write": "auth.uid === 'wolverine'",
-          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())",
-          ".indexOn": "g"
+          ".validate": "!data.exists() || (newData.child('numOfLikes').val() === root.child('photos').child($photo_id).child('numOfLikes').val())"
         }
       }
     },
