@@ -25,6 +25,8 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', require('./routes/index'));
+app.use('/alive', require('./routes/index'));
+app.use('/dead', require('./routes/index'));
 app.use('/api/v1/photos', require('./routes/api/v1/photos'));
 app.use('/api/v1/labels', require('./routes/api/v1/labels'));
 app.use('/api/v1/likes', require('./routes/api/v1/likes'));
@@ -33,6 +35,7 @@ app.use('/api/v1/geofire', require('./routes/api/v1/geofire'));
 app.use('/api/v1/favoriteLabel', require('./routes/api/v1/favoriteLabel'));
 app.use('/api/v1/pushNotification', require('./routes/api/v1/pushNotification'));
 app.use('/api/v1/reportPhoto', require('./routes/api/v1/reportPhoto'));
+app.use('/api/v1/dynamicLinks', require('./routes/api/v1/dynamicLinks'));
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

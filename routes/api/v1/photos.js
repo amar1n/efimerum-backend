@@ -35,12 +35,50 @@ const efimerumStorageBucketPublicURL = 'https://storage.googleapis.com/efimerum-
 var GeoFire = require('geofire');
 var geoFire = new GeoFire(rootRef.child(nodeGeoFirePhotos));
 
+var request = require('request');
+var firebaseDynamiclinksApiUrl = 'https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=';
+var firebaseWebApiKey = 'AIzaSyDZcz1tbmPrkSYDOoTOxq4_LIVCjzytSKs';
+var firebaseDynamicLinkDomain = 'https://q39as.app.goo.gl/';
+var efimerumUrl = 'https://efimerum-48618.appspot.com';
+var efimerumPhotosUrl = 'https://efimerum-48618.appspot.com/api/v1/photos';
+var efimerum_AndroidPackageName = 'com.efimerum.efimerum';
+var efimerum_iosBundleId = 'com.charlesmoncada.Efimerum';
+var efimerum_iosAppStoreId = '1009116743';
+
 router.get('/json', function (req, res) {
     var photosRef = rootRef.child(nodePhotos);
     photosRef.once('value')
         .then(function (snap) {
             var snapShuffled = shuffleFirebaseSnapshot(snap);
             return res.status(200).json({success: true, data: snapShuffled});
+        })
+        .catch(function (error) {
+            return res.status(500).json({success: false, error: error});
+        });
+});
+
+/**
+ * @api {get} /photos/:photoKey
+ * @apiGroup Photos
+ * @apiDescription Used to know if a photo is alive
+ * @apiParam {String} photoKey Photo identifier
+ * @apiExample Example of use:
+ * https://efimerum-48618.appspot.com/api/v1/photos/XXyXX
+ */
+router.get('/:id', function (req, res) {
+    if (req.params.id === undefined) {
+        return res.status(400).json({success: false, error: 'Wrong API call (query)'});
+    }
+    var photoKey = req.params.id;
+    var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
+    _photoRef.once('value')
+        .then(function (snap) {
+            var _photo = snap.val();
+            if (_photo != null) {
+                return res.redirect('/alive');
+            } else {
+                return res.redirect('/dead');
+            }
         })
         .catch(function (error) {
             return res.status(500).json({success: false, error: error});
@@ -95,10 +133,11 @@ router.get('/json', function (req, res) {
  4) Subimos la imagen al storage
  5) Creamos el thumbnail de la imagen
  6) Subimos el thumbnail de la imagen al storage
- 7) Generamos los nodos en la BBDD de Firebase
- 8) Persistimos en la BBDD de Firebase todos los nodos generados
- 9) Persistimos en la BBDD de Firebase la info de GeoFire
- 10) Propagar la info de Geofire a todos los nodos donde está la foto
+ 7) Obtenemos el Firebase Dynamic Link de la foto
+ 8) Generamos los nodos en la BBDD de Firebase
+ 9) Persistimos en la BBDD de Firebase todos los nodos generados
+ 10) Persistimos en la BBDD de Firebase la info de GeoFire
+ 11) Propagar la info de Geofire a todos los nodos donde está la foto
  */
 router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     var uid = req.uid || 'batman';
@@ -187,110 +226,147 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             return res.status(500).json({success: false, error: err});
                         }
 
-                        // 7) Generamos los nodos en la BBDD de Firebase
+                        // 7) Obtenemos el Firebase Dynamic Link de la foto
                         var photoKey = rootRef.child(nodePhotos).push().key;
-                        var imageData = {};
-                        imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
-                        var dimensions = sizeOf(photoPath);
-                        imageData['width'] = dimensions.width;
-                        imageData['height'] = dimensions.height;
-                        imageData['fileName'] = photoFilename;
-                        var thumbnailData = {};
-                        thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
-                        var dimensionsThumbnail = sizeOf(thumbnailPath);
-                        thumbnailData['width'] = dimensionsThumbnail.width;
-                        thumbnailData['height'] = dimensionsThumbnail.height;
-                        thumbnailData['fileName'] = thumbnailFilename;
-
-                        var now = moment();
-                        var photoData = {
-                            creationDate: now.unix(),
-                            expirationDate: now.add(1, 'hours').unix(),
-                            labels: labels,
-                            imageData: imageData,
-                            thumbnailData: thumbnailData,
-                            numOfLikes: 0,
-                            owner: uid,
-                            md5: md5(photoFilename),
-                            sha1: sha1(photoFilename),
-                            sha256: sha256(photoFilename),
-                            randomString: randomstring.generate()
+                        var json = {
+                            "longDynamicLink": firebaseDynamicLinkDomain + "?link=" + efimerumPhotosUrl + '/' + photoKey +
+                            "&apn=" + efimerum_AndroidPackageName + "&afl=" + efimerumUrl +
+                            "&ibi=" + efimerum_iosBundleId + "&isi=" + efimerum_iosAppStoreId + "&ifl=" + efimerumUrl,
+                            "suffix": {
+                                "option": "UNGUESSABLE"
+                            }
                         };
-
-                        if (bFlagCoordinates) {
-                            photoData.latitude = latitude;
-                            photoData.longitude = longitude;
-                        }
-
-                        updates[nodePhotos + '/' + photoKey] = photoData;
-                        Object.keys(labelsEN).forEach(function (label) {
-                            updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
-                        });
-                        updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
-                        updates[node_Photos + '/' + photoKey] = photoData;
-
-                        // 8) Persistimos en la BBDD de Firebase todos los nodos generados
-                        rootRef.update(updates)
-                            .then(function () {
-                                fs.unlink(photoPath, function (err) {
-                                    if (err) {
-                                        return logError('POST photos', '.............unlink photoPath: ' + photoPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
-                                    }
-                                });
-                                fs.unlink(thumbnailPath, function (err) {
-                                    if (err) {
-                                        return logError('POST photos', '.............unlink thumbnailPath: ' + thumbnailPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
-                                    }
-                                });
-
-                                // 9) Persistimos en la BBDD de Firebase la info de GeoFire
-                                if (bFlagCoordinates) {
-                                    geoFire.set(photoKey, [latitude, longitude]).then(function () {
-
-                                        // 10) Propagar la info de Geofire a todos los nodos donde está la foto
-                                        var photoGeoRef = rootRef.child(nodeGeoFirePhotos + '/' + photoKey);
-                                        photoGeoRef.once('value')
-                                            .then(function (snap) {
-                                                var photoGeo = snap.val();
-                                                updates = {};
-                                                var keys = Object.keys(photoGeo);
-                                                keys.forEach(function (entry) {
-                                                    updates[nodePhotos + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                    Object.keys(labelsEN).forEach(function (label) {
-                                                        updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                    });
-                                                    updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                    updates[node_Photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                });
-                                                rootRef.update(updates)
-                                                    .then(function () {
-                                                        return res.status(200).json({success: true, data: photoKey});
-                                                    })
-                                                    .catch(function (error) {
-                                                        logError('POST photos', '.............GeoFire propagation-update Error: ' + error + '....with photoKey: ' + photoKey);
-                                                        return res.status(500).json({success: false, error: error});
-                                                    });
-                                            })
-                                            .catch(function (error) {
-                                                logError('POST photos', '.............GeoFire propagation Error: ' + error + '....with photoKey: ' + photoKey);
-                                            });
-                                    }).catch(function (error) {
-                                        logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
-                                        return res.status(500).json({
-                                            success: false,
-                                            error: 'Photo added without GeoFire info!'
-                                        });
-                                    });
-                                } else {
-                                    return res.status(200).json({success: true, data: photoKey});
-                                }
-                            })
-                            .catch(function (error) {
-                                processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
+                        var options = {
+                            url: firebaseDynamiclinksApiUrl + firebaseWebApiKey,
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            json: json
+                        };
+                        request(options, function (err, result, body) {
+                            if (err) {
+                                processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
                                     photoPath, photoFilename, true, true,
                                     thumbnailPath, thumbnailFilename, true, true);
-                                return res.status(500).json({success: false, error: error});
+                                return res.status(500).json({success: false, error: err});
+                            }
+                            if (!(result && (result.statusCode === 200 || result.statusCode === 201))) {
+                                processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
+                                    photoPath, photoFilename, true, true,
+                                    thumbnailPath, thumbnailFilename, true, true);
+                                return res.status(500).json({success: false, error: 'Error generating Firebase Dynamic Link'});
+                            }
+
+                            // 8) Generamos los nodos en la BBDD de Firebase
+                            var imageData = {};
+                            imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
+                            var dimensions = sizeOf(photoPath);
+                            imageData['width'] = dimensions.width;
+                            imageData['height'] = dimensions.height;
+                            imageData['fileName'] = photoFilename;
+                            var thumbnailData = {};
+                            thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
+                            var dimensionsThumbnail = sizeOf(thumbnailPath);
+                            thumbnailData['width'] = dimensionsThumbnail.width;
+                            thumbnailData['height'] = dimensionsThumbnail.height;
+                            thumbnailData['fileName'] = thumbnailFilename;
+
+                            var now = moment();
+                            var photoData = {
+                                creationDate: now.unix(),
+                                expirationDate: now.add(1, 'hours').unix(),
+                                labels: labels,
+                                imageData: imageData,
+                                thumbnailData: thumbnailData,
+                                numOfLikes: 0,
+                                owner: uid,
+                                md5: md5(photoFilename),
+                                sha1: sha1(photoFilename),
+                                sha256: sha256(photoFilename),
+                                randomString: randomstring.generate(),
+                                dynamicLink: body.shortLink
+                            };
+
+                            if (bFlagCoordinates) {
+                                photoData.latitude = latitude;
+                                photoData.longitude = longitude;
+                            }
+
+                            updates[nodePhotos + '/' + photoKey] = photoData;
+                            Object.keys(labelsEN).forEach(function (label) {
+                                updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
                             });
+                            updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
+                            updates[node_Photos + '/' + photoKey] = photoData;
+
+                            // 9) Persistimos en la BBDD de Firebase todos los nodos generados
+                            rootRef.update(updates)
+                                .then(function () {
+                                    fs.unlink(photoPath, function (err) {
+                                        if (err) {
+                                            return logError('POST photos', '.............unlink photoPath: ' + photoPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
+                                        }
+                                    });
+                                    fs.unlink(thumbnailPath, function (err) {
+                                        if (err) {
+                                            return logError('POST photos', '.............unlink thumbnailPath: ' + thumbnailPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
+                                        }
+                                    });
+
+                                    // 10) Persistimos en la BBDD de Firebase la info de GeoFire
+                                    if (bFlagCoordinates) {
+                                        geoFire.set(photoKey, [latitude, longitude]).then(function () {
+
+                                            // 11) Propagar la info de Geofire a todos los nodos donde está la foto
+                                            var photoGeoRef = rootRef.child(nodeGeoFirePhotos + '/' + photoKey);
+                                            photoGeoRef.once('value')
+                                                .then(function (snap) {
+                                                    var photoGeo = snap.val();
+                                                    updates = {};
+                                                    var keys = Object.keys(photoGeo);
+                                                    keys.forEach(function (entry) {
+                                                        updates[nodePhotos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                        Object.keys(labelsEN).forEach(function (label) {
+                                                            updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                        });
+                                                        updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                        updates[node_Photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    });
+                                                    rootRef.update(updates)
+                                                        .then(function () {
+                                                            return res.status(200).json({
+                                                                success: true,
+                                                                data: photoKey
+                                                            });
+                                                        })
+                                                        .catch(function (error) {
+                                                            logError('POST photos', '.............GeoFire propagation-update Error: ' + error + '....with photoKey: ' + photoKey);
+                                                            return res.status(500).json({success: false, error: error});
+                                                        });
+                                                })
+                                                .catch(function (error) {
+                                                    logError('POST photos', '.............GeoFire propagation Error: ' + error + '....with photoKey: ' + photoKey);
+                                                });
+                                        }).catch(function (error) {
+                                            logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
+                                            return res.status(500).json({
+                                                success: false,
+                                                error: 'Photo added without GeoFire info!'
+                                            });
+                                        });
+                                    } else {
+                                        return res.status(200).json({success: true, data: photoKey});
+                                    }
+                                })
+                                .catch(function (error) {
+                                    processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
+                                        photoPath, photoFilename, true, true,
+                                        thumbnailPath, thumbnailFilename, true, true);
+                                    return res.status(500).json({success: false, error: error});
+                                });
+
+                        });
                     });
                 });
             }, function (err) {

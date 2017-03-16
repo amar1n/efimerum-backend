@@ -6,6 +6,14 @@ router.get('/', function(req, res, next) {
     res.render('index', { title: 'Express' });
 });
 
+router.get('/alive', function(req, res, next) {
+    res.render('efimerum_alive', { title: 'Express' });
+});
+
+router.get('/dead', function(req, res, next) {
+    res.render('efimerum_dead', { title: 'Express' });
+});
+
 router.get('/v1/addPhoto', function(req, res, next) {
     res.render('v1/addPhoto');
 });
@@ -36,6 +44,10 @@ router.get('/v1/geofire', function(req, res, next) {
 
 router.get('/v1/reportPhoto', function(req, res, next) {
     res.render('v1/reportPhoto');
+});
+
+router.get('/v1/dynamicLinks', function(req, res, next) {
+    res.render('v1/dynamicLinks');
 });
 
 module.exports = router;
