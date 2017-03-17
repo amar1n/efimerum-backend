@@ -94,7 +94,7 @@ router.post('/', firebaseAuth(), function (req, res) {
             var etiqueta = snap.key;
             var uid = req.uid || 'batman';
             var updates = {};
-            updates[nodeFavoriteLabelsByUser + '/' + uid + '/' + lang + '/' + etiqueta] = true;
+            updates[nodeFavoriteLabelsByUser + '/' + uid + '/' + lang + '/' + etiqueta] = etiqueta;
 
             // 3) Persistimos en la BBDD de Firebase todos los nodos generados
             rootRef.update(updates)
