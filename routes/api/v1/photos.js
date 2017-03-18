@@ -4,7 +4,7 @@ var debug = require('debug')('efimerum:photos');
 var express = require('express');
 var router = express.Router();
 var fs = require('fs');
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var shuffleFirebaseSnapshot = require('./../../../lib/utils').shuffleFirebaseJSON;
@@ -21,32 +21,12 @@ var sha256 = require('sha256');
 var randomstring = require('randomstring');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
-
-const node_Photos = '_photos';
-const nodePhotos = 'photos';
-const nodeLabels = 'labels';
-const nodePhotosByLabel = 'photosByLabel';
-const nodePhotosPostedByUser = 'photosPostedByUser';
-const nodeGeoFirePhotos = 'geofirePhotos';
-const languageEN = 'EN';
-const efimerumStorageBucket = 'efimerum-photos';
-const efimerumStorageBucketPublicURL = 'https://storage.googleapis.com/efimerum-photos';
-
 var GeoFire = require('geofire');
-var geoFire = new GeoFire(rootRef.child(nodeGeoFirePhotos));
-
+var geoFire = new GeoFire(rootRef.child(constants.firebaseNodes.geoFirePhotos));
 var request = require('request');
-var firebaseDynamiclinksApiUrl = 'https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=';
-var firebaseWebApiKey = 'AIzaSyDZcz1tbmPrkSYDOoTOxq4_LIVCjzytSKs';
-var firebaseDynamicLinkDomain = 'https://q39as.app.goo.gl/';
-var efimerumUrl = 'https://efimerum-48618.appspot.com';
-var efimerumPhotosUrl = 'https://efimerum-48618.appspot.com/api/v1/photos';
-var efimerum_AndroidPackageName = 'com.efimerum.efimerum';
-var efimerum_iosBundleId = 'com.charlesmoncada.Efimerum';
-var efimerum_iosAppStoreId = '1009116743';
 
 router.get('/json', function (req, res) {
-    var photosRef = rootRef.child(nodePhotos);
+    var photosRef = rootRef.child(constants.firebaseNodes.photos);
     photosRef.once('value')
         .then(function (snap) {
             var snapShuffled = shuffleFirebaseSnapshot(snap);
@@ -70,7 +50,7 @@ router.get('/:id', function (req, res) {
         return res.status(400).json({success: false, error: 'Wrong API call (query)'});
     }
     var photoKey = req.params.id;
-    var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
+    var _photoRef = rootRef.child(constants.firebaseNodes._photos + '/' + photoKey);
     _photoRef.once('value')
         .then(function (snap) {
             var _photo = snap.val();
@@ -155,7 +135,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     }
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
-    const fotosBucket = storage.bucket(efimerumStorageBucket);
+    const fotosBucket = storage.bucket(constants.googleCloudStorage.efimerumStorageBucket);
 
     // 2) Realizamos el SafeSearch y la detección de etiquetas
     var options = {
@@ -185,10 +165,10 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
         detections.labels.forEach(function (label) {
             if (label.score > 75) {
                 labelsEN[label.desc] = label.desc;
-                updates[nodeLabels + '/' + languageEN + '/' + label.desc] = label.desc;
+                updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + label.desc] = label.desc;
             }
         });
-        labels[languageEN] = labelsEN;
+        labels[constants.firebaseNodes.languageEN] = labelsEN;
 
         // 4) Subimos la imagen al storage
         fotosBucket.upload(photoPath, function (err, file) {
@@ -227,17 +207,17 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                         }
 
                         // 7) Obtenemos el Firebase Dynamic Link de la foto
-                        var photoKey = rootRef.child(nodePhotos).push().key;
+                        var photoKey = rootRef.child(constants.firebaseNodes.photos).push().key;
                         var json = {
-                            "longDynamicLink": firebaseDynamicLinkDomain + "?link=" + efimerumPhotosUrl + '/' + photoKey +
-                            "&apn=" + efimerum_AndroidPackageName + "&afl=" + efimerumUrl +
-                            "&ibi=" + efimerum_iosBundleId + "&isi=" + efimerum_iosAppStoreId + "&ifl=" + efimerumUrl,
+                            "longDynamicLink": constants.firebaseDynamicLinks.firebaseDynamicLinkDomain + "?link=" + constants.firebaseDynamicLinks.efimerumPhotosUrl + '/' + photoKey +
+                            "&apn=" + constants.firebaseDynamicLinks.efimerum_AndroidPackageName + "&afl=" + constants.firebaseDynamicLinks.efimerumUrl +
+                            "&ibi=" + constants.firebaseDynamicLinks.efimerum_iosBundleId + "&isi=" + constants.firebaseDynamicLinks.efimerum_iosAppStoreId + "&ifl=" + constants.firebaseDynamicLinks.efimerumUrl,
                             "suffix": {
                                 "option": "UNGUESSABLE"
                             }
                         };
                         var options = {
-                            url: firebaseDynamiclinksApiUrl + firebaseWebApiKey,
+                            url: constants.firebaseDynamicLinks.firebaseDynamiclinksApiUrl + constants.firebaseDynamicLinks.firebaseWebApiKey,
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -260,13 +240,13 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
 
                             // 8) Generamos los nodos en la BBDD de Firebase
                             var imageData = {};
-                            imageData['url'] = efimerumStorageBucketPublicURL + '/' + photoFilename;
+                            imageData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + photoFilename;
                             var dimensions = sizeOf(photoPath);
                             imageData['width'] = dimensions.width;
                             imageData['height'] = dimensions.height;
                             imageData['fileName'] = photoFilename;
                             var thumbnailData = {};
-                            thumbnailData['url'] = efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
+                            thumbnailData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
                             var dimensionsThumbnail = sizeOf(thumbnailPath);
                             thumbnailData['width'] = dimensionsThumbnail.width;
                             thumbnailData['height'] = dimensionsThumbnail.height;
@@ -293,12 +273,12 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                                 photoData.longitude = longitude;
                             }
 
-                            updates[nodePhotos + '/' + photoKey] = photoData;
+                            updates[constants.firebaseNodes.photos + '/' + photoKey] = photoData;
                             Object.keys(labelsEN).forEach(function (label) {
-                                updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = photoData;
+                                updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey] = photoData;
                             });
-                            updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
-                            updates[node_Photos + '/' + photoKey] = photoData;
+                            updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
+                            updates[constants.firebaseNodes._photos + '/' + photoKey] = photoData;
 
                             // 9) Persistimos en la BBDD de Firebase todos los nodos generados
                             rootRef.update(updates)
@@ -319,19 +299,19 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                                         geoFire.set(photoKey, [latitude, longitude]).then(function () {
 
                                             // 11) Propagar la info de Geofire a todos los nodos donde está la foto
-                                            var photoGeoRef = rootRef.child(nodeGeoFirePhotos + '/' + photoKey);
+                                            var photoGeoRef = rootRef.child(constants.firebaseNodes.geoFirePhotos + '/' + photoKey);
                                             photoGeoRef.once('value')
                                                 .then(function (snap) {
                                                     var photoGeo = snap.val();
                                                     updates = {};
                                                     var keys = Object.keys(photoGeo);
                                                     keys.forEach(function (entry) {
-                                                        updates[nodePhotos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                        updates[constants.firebaseNodes.photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
                                                         Object.keys(labelsEN).forEach(function (label) {
-                                                            updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                            updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
                                                         });
-                                                        updates[nodePhotosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                        updates[node_Photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                        updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                        updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
                                                     });
                                                     rootRef.update(updates)
                                                         .then(function () {

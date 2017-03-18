@@ -3,16 +3,13 @@
 var debug = require('debug')('efimerum:reportPhoto');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var moment = require('moment');
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
 var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
-
-const node_Photos = '_photos';
-const nodeReports = 'reports';
 
 /**
  * @api {post} /reportPhoto
@@ -89,7 +86,7 @@ router.post('/', firebaseAuth(), function (req, res) {
 
     // 2) Obtenemos la referencia a la foto de uso exclusivo del Backend
     var photoKey = req.body.photoKey;
-    var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
+    var _photoRef = rootRef.child(constants.firebaseNodes._photos + '/' + photoKey);
     _photoRef.once('value')
         .then(function (snap) {
             var _photo = snap.val();
@@ -121,7 +118,7 @@ router.post('/', firebaseAuth(), function (req, res) {
 
             // 4) Generamos los nodos para la denuncia en la BBDD de Firebase
             var updates = {};
-            var reportKey = rootRef.child(nodeReports).push().key;
+            var reportKey = rootRef.child(constants.firebaseNodes.reports).push().key;
             var now = moment();
             var reportData = {
                 creationDate: now.unix(),
@@ -129,8 +126,8 @@ router.post('/', firebaseAuth(), function (req, res) {
                 photoKey: photoKey,
                 reportCode: reportCode
             };
-            updates[nodeReports + '/' + reportKey] = reportData;
-            updates[node_Photos + '/' + photoKey + '/' + 'reports' + '/' + reportKey] = reportData;
+            updates[constants.firebaseNodes.reports + '/' + reportKey] = reportData;
+            updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + 'reports' + '/' + reportKey] = reportData;
 
 
             // 5) Persistimos en la BBDD de Firebase los nodos generados

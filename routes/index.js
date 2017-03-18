@@ -26,6 +26,10 @@ router.get('/v1/addFavoriteLabel', function(req, res, next) {
     res.render('v1/addFavoriteLabel');
 });
 
+router.get('/v1/deleteFavoriteLabel', function(req, res, next) {
+    res.render('v1/deleteFavoriteLabel');
+});
+
 router.get('/v1/getLabels', function(req, res, next) {
     res.render('v1/getLabels');
 });

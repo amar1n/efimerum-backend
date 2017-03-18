@@ -3,9 +3,7 @@
 var debug = require('debug')('efimerum:clean');
 var express = require('express');
 var router = express.Router();
-
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
-
 var pp = require('./../../../lib/utils').processPhotos;
 
 /**

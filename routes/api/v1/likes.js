@@ -3,7 +3,7 @@
 var debug = require('debug')('efimerum:likes');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var moment = require('moment');
@@ -12,21 +12,8 @@ var logError = require('./../../../lib/utils').logError;
 var logInfo = require('./../../../lib/utils').logInfo;
 var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 var pushNotification = require('./../../../lib/googleCloudPlatform').pushNotification;
-
-const node_Photos = '_photos';
-const nodePhotos = 'photos';
-const nodePhotosByLabel = 'photosByLabel';
-const nodeLikes = 'likes';
-const nodeLikesByPhoto = 'likesByPhoto';
-const nodePhotosPostedByUser = 'photosPostedByUser';
-const nodePhotosLikedByUser = 'photosLikedByUser';
-const nodeGeoFireLikes = 'geofireLikes';
-const languageEN = 'EN';
-const nodeUsers = 'users';
-const notificationCode = 'LIKE';
-
 var GeoFire = require('geofire');
-var geoFire = new GeoFire(rootRef.child(nodeGeoFireLikes));
+var geoFire = new GeoFire(rootRef.child(constants.firebaseNodes.geoFireLikes));
 
 /**
  * @api {post} /likes
@@ -105,7 +92,7 @@ router.post('/', firebaseAuth(), function (req, res) {
 
     // 1) Obtenemos la referencia a la foto de uso exclusivo del Backend
     var photoKey = req.body.photoKey;
-    var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
+    var _photoRef = rootRef.child(constants.firebaseNodes._photos + '/' + photoKey);
     _photoRef.once('value')
         .then(function (snap) {
             var _photo = snap.val();
@@ -134,7 +121,7 @@ router.post('/', firebaseAuth(), function (req, res) {
             }
 
             // 4) Actualizamos el contador y expirationDate de la foto en la BBDD de Firebase
-            var photoRef = rootRef.child(nodePhotos + '/' + photoKey);
+            var photoRef = rootRef.child(constants.firebaseNodes.photos + '/' + photoKey);
             photoRef.transaction(function (currentData) {
                 if (currentData != null) {
                     currentData.numOfLikes = currentData.numOfLikes + 1;
@@ -170,7 +157,7 @@ router.post('/', firebaseAuth(), function (req, res) {
                     // 6) Generamos los nodos para los likes en la BBDD de Firebase
                     var foto = snapshot.val();
                     var updates = {};
-                    var likeKey = rootRef.child(nodeLikes).push().key;
+                    var likeKey = rootRef.child(constants.firebaseNodes.likes).push().key;
                     var now = moment();
                     var likeData = {
                         creationDate: now.unix(),
@@ -183,28 +170,28 @@ router.post('/', firebaseAuth(), function (req, res) {
                         likeData.longitude = longitude;
                     }
 
-                    updates[nodeLikes + '/' + likeKey] = likeData;
-                    updates[nodeLikesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
+                    updates[constants.firebaseNodes.likes + '/' + likeKey] = likeData;
+                    updates[constants.firebaseNodes.likesByPhoto + '/' + photoKey + '/' + likeKey] = likeData;
 
                     // 7) Propagamos el like en la foto de uso exclusivo del Backend
-                    updates[node_Photos + '/' + photoKey + '/' + 'likes' + '/' + likeKey] = likeData;
-                    updates[node_Photos + '/' + photoKey + '/' + 'numOfLikes'] = foto.numOfLikes;
-                    updates[node_Photos + '/' + photoKey + '/' + 'expirationDate'] = foto.expirationDate;
+                    updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + 'likes' + '/' + likeKey] = likeData;
+                    updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + 'numOfLikes'] = foto.numOfLikes;
+                    updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + 'expirationDate'] = foto.expirationDate;
 
                     // 8) Propagamos la foto a todos los nodos que la redundan en la BBDD de Firebase
                     //      - photosByLabel
                     //      - photosPostedByUser
                     //      - photosLikedByUser
                     if (foto.labels !== undefined) {
-                        Object.keys(foto.labels[languageEN]).forEach(function (label) {
-                            updates[nodePhotosByLabel + '/' + languageEN + '/' + label + '/' + photoKey] = foto;
+                        Object.keys(foto.labels[constants.firebaseNodes.languageEN]).forEach(function (label) {
+                            updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey] = foto;
                         });
                     }
-                    updates[nodePhotosPostedByUser + '/' + foto.owner + '/' + photoKey] = foto;
-                    updates[nodePhotosLikedByUser + '/' + uid + '/' + photoKey] = foto;
+                    updates[constants.firebaseNodes.photosPostedByUser + '/' + foto.owner + '/' + photoKey] = foto;
+                    updates[constants.firebaseNodes.photosLikedByUser + '/' + uid + '/' + photoKey] = foto;
                     if (_photo.likes !== undefined) {
                         Object.keys(_photo.likes).forEach(function (like) {
-                            updates[nodePhotosLikedByUser + '/' + _photo.likes[like].userId + '/' + photoKey] = foto;
+                            updates[constants.firebaseNodes.photosLikedByUser + '/' + _photo.likes[like].userId + '/' + photoKey] = foto;
                         });
                     }
 
@@ -213,7 +200,7 @@ router.post('/', firebaseAuth(), function (req, res) {
                         .then(function () {
 
                             // 10.a) Enviamos una notificación al dueño de la foto, avisándole que su foto... gusta!!!
-                            var userRef = rootRef.child(nodeUsers + '/' + _photo.owner);
+                            var userRef = rootRef.child(constants.firebaseNodes.users + '/' + _photo.owner);
                             userRef.once('value')
                                 .then(function (snap) {
                                     var owner = snap.val();
@@ -221,7 +208,7 @@ router.post('/', firebaseAuth(), function (req, res) {
                                     if (fcmToken === undefined) {
                                         logError('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: User (' + user.email + ') without FCM Token');
                                     } else {
-                                        pushNotification(notificationCode, photoKey, fcmToken)
+                                        pushNotification(constants.firebasePushNotifications.likeNotificationCode, photoKey, fcmToken)
                                             .then(function (response) {
                                                 logInfo('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Successfully sent with response: ' + response);
                                             })

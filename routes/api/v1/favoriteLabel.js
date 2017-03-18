@@ -3,16 +3,12 @@
 var debug = require('debug')('efimerum:favoriteLabels');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
 var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
-
-const nodeLabels = 'labels';
-const nodeFavoriteLabelsByUser = 'favoriteLabelsByUser';
-const languageEN = 'EN';
 
 /**
  * @api {post} /favoriteLabels
@@ -70,7 +66,7 @@ router.post('/', firebaseAuth(), function (req, res) {
 
     // 1) Validamos el idioma indicado
     var lang = req.body.lang;
-    var validLanguages = [languageEN];
+    var validLanguages = [constants.firebaseNodes.languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
             logError('POST favoriteLabel', 'Wrong API call (wrong language)');
@@ -83,7 +79,7 @@ router.post('/', firebaseAuth(), function (req, res) {
 
     // 2) Validamos la etiqueta indicada
     var label = req.body.label;
-    var labelsRef = rootRef.child(nodeLabels + '/' + lang + '/' + label);
+    var labelsRef = rootRef.child(constants.firebaseNodes.labels + '/' + lang + '/' + label);
     labelsRef.once('value')
         .then(function (snap) {
             if (snap.val() == null) {
@@ -94,7 +90,7 @@ router.post('/', firebaseAuth(), function (req, res) {
             var etiqueta = snap.key;
             var uid = req.uid || 'batman';
             var updates = {};
-            updates[nodeFavoriteLabelsByUser + '/' + uid + '/' + lang + '/' + etiqueta] = etiqueta;
+            updates[constants.firebaseNodes.favoriteLabelsByUser + '/' + uid + '/' + lang + '/' + etiqueta] = etiqueta;
 
             // 3) Persistimos en la BBDD de Firebase todos los nodos generados
             rootRef.update(updates)
@@ -158,7 +154,7 @@ router.delete('/', firebaseAuth(), function (req, res) {
 
     // 1) Validamos el idioma indicado
     var lang = req.query.lang;
-    var validLanguages = [languageEN];
+    var validLanguages = [constants.firebaseNodes.languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
             logError('DELETE favoriteLabel', 'Wrong API call (wrong language)');
@@ -172,7 +168,7 @@ router.delete('/', firebaseAuth(), function (req, res) {
     var uid = req.uid || 'batman';
     var label = req.query.label;
     var updates = {};
-    updates[nodeFavoriteLabelsByUser + '/' + uid + '/' + lang + '/' + label] = null;
+    updates[constants.firebaseNodes.favoriteLabelsByUser + '/' + uid + '/' + lang + '/' + label] = null;
 
     // 2) Persistimos en la BBDD de Firebase todos los nodos generados
     rootRef.update(updates)

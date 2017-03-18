@@ -3,15 +3,12 @@
 var debug = require('debug')('efimerum:pushNotification');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
-
-const node_Photos = '_photos';
-const nodeUsers = 'users';
-
 var pushNotification = require('./../../../lib/googleCloudPlatform').pushNotification;
+var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
 
 /**
  * @api {post} /pushNotification
@@ -62,12 +59,12 @@ router.post('/', firebaseAuth(), function (req, res) {
     var notificationCode = req.body.notificationCode;
     var photoKey = req.body.photoKey;
 
-    var _photoRef = rootRef.child(node_Photos + '/' + photoKey);
+    var _photoRef = rootRef.child(constants.firebaseNodes._photos + '/' + photoKey);
     _photoRef.once('value')
         .then(function (snap) {
             var _photo = snap.val();
 
-            var userRef = rootRef.child(nodeUsers + '/' + _photo.owner);
+            var userRef = rootRef.child(constants.firebaseNodes.users + '/' + _photo.owner);
             userRef.once('value')
                 .then(function (snap) {
                     var user = snap.val();

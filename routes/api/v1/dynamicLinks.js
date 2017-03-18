@@ -3,14 +3,8 @@
 var debug = require('debug')('efimerum:dynamicLinks');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var request = require('request');
-var firebaseWebApiKey = 'AIzaSyDZcz1tbmPrkSYDOoTOxq4_LIVCjzytSKs';
-var firebaseDynamicLinkDomain = 'https://q39as.app.goo.gl/';
-var efimerumUrl = 'https://efimerum-48618.appspot.com';
-var efimerum_AndroidPackageName = 'com.efimerum.efimerum';
-var efimerum_iosBundleId = 'com.charlesmoncada.Efimerum';
-var efimerum_iosAppStoreId = '1009116743';
 
 router.post('/', function (req, res) {
     var photoKey = req.body.photoKey;
@@ -19,15 +13,15 @@ router.post('/', function (req, res) {
     }
 
     var json = {
-        "longDynamicLink": firebaseDynamicLinkDomain + "?link=" + efimerumUrl + '/api/v1/photos/' + photoKey +
-        "&apn=" + efimerum_AndroidPackageName + "&afl=" + efimerumUrl +
-        "&ibi=" + efimerum_iosBundleId + "&isi=" + efimerum_iosAppStoreId + "&ifl=" + efimerumUrl,
+        "longDynamicLink": constants.firebaseDynamicLinks.firebaseDynamicLinkDomain + "?link=" + constants.firebaseDynamicLinks.efimerumUrl + '/api/v1/photos/' + photoKey +
+        "&apn=" + constants.firebaseDynamicLinks.efimerum_AndroidPackageName + "&afl=" + constants.firebaseDynamicLinks.efimerumUrl +
+        "&ibi=" + constants.firebaseDynamicLinks.efimerum_iosBundleId + "&isi=" + constants.firebaseDynamicLinks.efimerum_iosAppStoreId + "&ifl=" + constants.firebaseDynamicLinks.efimerumUrl,
         "suffix": {
             "option": "UNGUESSABLE"
         }
     };
     var options = {
-        url: 'https://firebasedynamiclinks.googleapis.com/v1/shortLinks?key=' + firebaseWebApiKey,
+        url: constants.firebaseDynamicLinks.firebaseDynamiclinksApiUrl + constants.firebaseDynamicLinks.firebaseWebApiKey,
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'

@@ -3,16 +3,12 @@
 var debug = require('debug')('efimerum:labels');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
 var firebaseAuth = require('../../../lib/firebaseAuth.js');
 var logError = require('./../../../lib/utils').logError;
 var validateReqDataKeys = require('./../../../lib/utils').validateReqDataKeys;
-
-const nodeLabels = 'labels';
-const nodeFavoriteLabelsByUser = 'favoriteLabelsByUser';
-const languageEN = 'EN';
 
 /**
  * @api {post} /labels
@@ -82,14 +78,14 @@ router.post('/', firebaseAuth(), function (req, res) {
     var myFavorites = req.body.myFavorites;
     if (myFavorites === 'true') {
         var uid = req.uid || 'batman';
-        labelsRefAUX = nodeFavoriteLabelsByUser + '/' + uid;
+        labelsRefAUX = constants.firebaseNodes.favoriteLabelsByUser + '/' + uid;
     } else {
-        labelsRefAUX = nodeLabels;
+        labelsRefAUX = constants.firebaseNodes.labels;
     }
 
     // 1.b) Validamos el idioma solicitado
     var lang = req.query.lang;
-    var validLanguages = [languageEN];
+    var validLanguages = [constants.firebaseNodes.languageEN];
     if (typeof lang !== 'undefined') {
         if (validLanguages.indexOf(lang) === -1) {
             return res.status(400).json({success: false, error: 'Wrong API call (language)'});

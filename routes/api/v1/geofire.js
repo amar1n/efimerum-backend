@@ -3,14 +3,11 @@
 var debug = require('debug')('efimerum:geofire');
 var express = require('express');
 var router = express.Router();
-
+var constants = require('./../../../lib/constants');
 var firebase = require('./../../../lib/googleCloudPlatform.js').firebase;
 var rootRef = firebase.database().ref();
-
-const nodeGeoFirePhotos = 'geofirePhotos';
-
 var GeoFire = require('geofire');
-var geoFire = new GeoFire(rootRef.child(nodeGeoFirePhotos));
+var geoFire = new GeoFire(rootRef.child(constants.firebaseNodes.geoFirePhotos));
 
 // const nodeAmg = 'amg';
 // const nodeAmgGeofire = 'amgGeofire';
