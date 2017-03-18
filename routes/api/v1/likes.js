@@ -208,13 +208,18 @@ router.post('/', firebaseAuth(), function (req, res) {
                                     if (fcmToken === undefined) {
                                         logError('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: User (' + user.email + ') without FCM Token');
                                     } else {
-                                        pushNotification(constants.firebasePushNotifications.likeNotificationCode, photoKey, fcmToken)
-                                            .then(function (response) {
-                                                logInfo('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Successfully sent with response: ' + response);
-                                            })
-                                            .catch(function (err) {
-                                                logError('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + err);
-                                            });
+                                        var likeNotificationEnabled = owner.likeNotificationEnabled;
+                                        if (likeNotificationEnabled !== undefined && !likeNotificationEnabled) {
+                                            logInfo('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', NOT send because user have disabled this notification!!!');
+                                        } else {
+                                            pushNotification(constants.firebasePushNotifications.likeNotificationCode, photoKey, fcmToken)
+                                                .then(function (response) {
+                                                    logInfo('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Successfully sent with response: ' + response);
+                                                })
+                                                .catch(function (err) {
+                                                    logError('POST likes', '.............PushNotification ....with photoKey: ' + photoKey + ' ....with likeKey: ' + likeKey + ', Error: ' + err);
+                                                });
+                                        }
                                     }
                                 })
                                 .catch(function (error) {
