@@ -146,7 +146,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     vision.detect(photoPath, options, function (err, detections, apiResponse) {
         if (err) {
             logError('POST photos', 'Cloud Vision Error with uid: ' + uid + ', Error: ' + err);
-            detections = {labels: [{desc: 'Who knows...', score: 100}]};
+            detections = {labels: [{desc: constants.googleCloudVision.defaultLabel, score: 100}]};
         }
 
         if (detections.safeSearch.adult == 'LIKELY' || detections.safeSearch.adult == 'VERY_LIKELY' ||
@@ -163,11 +163,15 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
         var labelsEN = {};
         var updates = {};
         detections.labels.forEach(function (label) {
-            if (label.score > 75) {
+            if (label.score > constants.googleCloudVision.defaultThreshold) {
                 labelsEN[label.desc] = label.desc;
                 updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + label.desc] = label.desc;
             }
         });
+        if (Object.keys(labelsEN).length === 0) {
+            labelsEN[constants.googleCloudVision.defaultLabel] = constants.googleCloudVision.defaultLabel;
+        }
+
         labels[constants.firebaseNodes.languageEN] = labelsEN;
 
         // 4) Subimos la imagen al storage
