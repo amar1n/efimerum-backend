@@ -36,6 +36,7 @@ app.use('/api/v1/favoriteLabel', require('./routes/api/v1/favoriteLabel'));
 app.use('/api/v1/pushNotification', require('./routes/api/v1/pushNotification'));
 app.use('/api/v1/reportPhoto', require('./routes/api/v1/reportPhoto'));
 app.use('/api/v1/dynamicLinks', require('./routes/api/v1/dynamicLinks'));
+app.use('/api/v1/likesMap', require('./routes/api/v1/likesMap'));
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

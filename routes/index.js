@@ -54,4 +54,8 @@ router.get('/v1/dynamicLinks', function(req, res, next) {
     res.render('v1/dynamicLinks');
 });
 
+router.get('/v1/likesMap', function(req, res, next) {
+    res.render('v1/likesMap');
+});
+
 module.exports = router;

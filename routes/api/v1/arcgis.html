@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no">
+
+    <title>Photo likes</title>
+
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+    <link rel="stylesheet" href="https://js.arcgis.com/3.20/esri/themes/calcite/dijit/calcite.css">
+    <link rel="stylesheet" href="https://js.arcgis.com/3.20/esri/themes/calcite/esri/esri.css">
+
+    <style>
+        html, body, #map {
+            height:100%;
+            width:100%;
+            margin:0;
+            padding:0;
+        }
+
+        #LocateButton {
+            position: absolute;
+            top: 95px;
+            left: 15px;
+            z-index: 50;
+        }
+
+        .calcite .esriSimpleSlider div:active, .calcite .esriSimpleSlider div:focus,
+        .calcite .LocateButton .zoomLocateButton:active, .calcite .LocateButton .zoomLocateButton:focus {
+            background-color: #fff;
+            color: #4c4c4c;
+        }
+
+        #loadingDivContainer {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: rgba(0,0,0,.6);
+            z-index: 101;
+        }
+
+        #loadingDiv {
+            height: 80px;
+            width: 260px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            background-color: white;
+            margin-left: -130px;
+            margin-top: -40px;
+        }
+
+        #loadingDiv img {
+            height: 40px;
+            width: 40px;
+            margin: 20px;
+        }
+
+        #loadingDiv span {
+            font-size: 17px;
+            font-weight: 600;
+            color: #666;
+            font-family: 'Roboto', sans-serif;
+            position: relative;
+            left: 0;
+            top: -35px;
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/3.7.0/firebase.js"></script>
+    <script>
+        var config = {
+            apiKey: "AIzaSyDZcz1tbmPrkSYDOoTOxq4_LIVCjzytSKs",
+            authDomain: "efimerum-48618.firebaseapp.com",
+            databaseURL: "https://efimerum-48618.firebaseio.com",
+            storageBucket: "efimerum-48618.appspot.com",
+            messagingSenderId: "704115223030"
+        };
+        firebase.initializeApp(config);
+    </script>
+
+    <script src="https://js.arcgis.com/3.20/"></script>
+    <script>
+        var map;
+
+        require(["esri/map",
+            "esri/dijit/LocateButton",
+            "esri/layers/FeatureLayer",
+            "esri/geometry/Point",
+            "esri/graphic",
+            "esri/geometry/Extent",
+            "esri/renderers/HeatmapRenderer",
+            "esri/tasks/query",
+            "dojo/dom-style",
+            "dojo/domReady!"], function(Map, LocateButton, FeatureLayer, Point, Graphic, Extent, HeatmapRenderer, Query, domStyle) {
+
+            var POINT_MARGIN = 2;
+            var queryObject;
+            var isDemo = false;
+
+            var url = window.location.href;
+            var index = url.indexOf("?");
+            if (index != -1) {
+                var query = url.substring(index + 1, url.length);
+                queryObject = dojo.queryToObject(query);
+            }
+
+            isDemo = queryObject && queryObject.demo && queryObject.demo == "true";
+
+            map = new Map("map", {
+                basemap: "dark-gray",
+                center: [-3.8196202,40.4378698],
+                zoom: 3,
+                logo: false,
+                showAttribution: false,
+                smartNavigation: false
+            });
+
+            var geoLocate = new LocateButton({
+                map: map,
+                scale: 2500
+            }, "LocateButton");
+            geoLocate.startup();
+
+            var featureCollection = {
+                "layerDefinition": null,
+                "featureSet": {
+                    "features": [],
+                    "geometryType": "esriGeometryPoint"
+                }
+            };
+            featureCollection.layerDefinition = {
+                "geometryType": "esriGeometryPoint",
+                "objectIdField": "ObjectID",
+                "fields": [{
+                    "name": "ObjectID",
+                    "alias": "ObjectID",
+                    "type": "esriFieldTypeOID"
+                }]
+            };
+
+            if (isDemo) {
+                featureLayer = new FeatureLayer("http://services5.arcgis.com/UIehWBwXHruOBSt7/arcgis/rest/services/terorism/FeatureServer/0", {
+                    mode: esri.layers.FeatureLayer.MODE_SELECTION,
+                    outFields: ["*"]
+                });
+            } else {
+                featureLayer = new FeatureLayer(featureCollection, {
+                    id: 'likesLayer'
+                });
+            }
+
+            var heatmapRenderer = new HeatmapRenderer({
+                blurRadius: 13,
+                maxPixelIntensity: 100,
+                minPixelIntensity: 0,
+                colors:["rgba(250, 0, 0, 0)","rgba(182, 117, 209, 0.5)","rgba(246, 156, 18, 0.5)","rgba(243, 156, 18, 0.6)","rgba(230, 229, 41, 0.8)","rgba(255, 0, 0, 0.7)"]
+            });
+
+            featureLayer.setRenderer(heatmapRenderer);
+
+            map.on("layers-add-result", function(results) {
+                if (isDemo) {
+                    var query = new Query();
+                    query.where = "iyear = 2000";
+                    featureLayer.selectFeatures(query, FeatureLayer.SELECTION_NEW);
+
+                    featureLayer.on("selection-complete", function() {
+                        featureLayer.redraw();
+                        hideLoading(false);
+                    });
+                } else {
+                    requestLikes();
+                }
+            });
+
+            map.addLayers([featureLayer]);
+
+            function requestLikes() {
+                if (queryObject && queryObject.photoUUID) {
+                    var dataInitialized = false;
+                    var likesRef = firebase.database().ref('/likesByPhoto/' + queryObject.photoUUID);
+
+                    likesRef.on('child_added', function(data) {
+                        if (dataInitialized && data && data.exists()) {
+                            var geometry = new Point(data.val().longitude, data.val().latitude);
+                            var graphic = new Graphic(geometry);
+                            featureLayer.applyEdits([graphic], null, null);
+                        }
+                    });
+
+                    likesRef.once('value').then(function(snapshot) {
+                        var features = [];
+                        var extent = null;
+
+                        snapshot.forEach(function(childSnapshot) {
+                            var childData = childSnapshot.val();
+
+                            var geometry = new Point(childData.longitude, childData.latitude);
+                            var pointExtetnt = new Extent(geometry.x - POINT_MARGIN, geometry.y - POINT_MARGIN, geometry.x + POINT_MARGIN, geometry.y + POINT_MARGIN);
+
+                            extent = extent ? extent.union(pointExtetnt) : pointExtetnt;
+
+                            var graphic = new Graphic(geometry);
+                            features.push(graphic);
+                        });
+
+                        featureLayer.applyEdits(features, null, null);
+
+                        if (extent) {
+                            map.setExtent(extent, true);
+                        }
+
+                        dataInitialized = true;
+
+                        hideLoading(false);
+                    });
+                } else {
+                    hideLoading(true);
+                }
+            }
+
+            function hideLoading(withError) {
+                domStyle.set("loadingDivContainer", "display", "none");
+
+                if (withError) {
+                    alert("photoUUID param is required");
+                }
+            }
+        });
+    </script>
+</head>
+<body class="calcite">
+    <div id="map">
+        <div id="loadingDivContainer">
+            <div id="loadingDiv">
+                <img src="https://firebasestorage.googleapis.com/v0/b/efimerum-48618.appspot.com/o/pageloader.gif?alt=media">
+                <span>Loading likes ...</span>
+            </div>
+        </div>
+        <div id="LocateButton"></div>
+    </div>
+</body>
+</html>
