@@ -113,6 +113,7 @@
                 basemap: "dark-gray",
                 center: [-3.8196202,40.4378698],
                 zoom: 3,
+                minZoom: 3,
                 logo: false,
                 showAttribution: false,
                 smartNavigation: false
@@ -185,9 +186,12 @@
 
                     likesRef.on('child_added', function(data) {
                         if (dataInitialized && data && data.exists()) {
-                            var geometry = new Point(data.val().longitude, data.val().latitude);
-                            var graphic = new Graphic(geometry);
-                            featureLayer.applyEdits([graphic], null, null);
+                            var childData = data.val();
+                            if (childData.longitude && childData.latitude) {
+                                var geometry = new Point(childData.longitude, childData.latitude);
+                                var graphic = new Graphic(geometry);
+                                featureLayer.applyEdits([graphic], null, null);
+                            }
                         }
                     });
 
@@ -197,14 +201,15 @@
 
                         snapshot.forEach(function(childSnapshot) {
                             var childData = childSnapshot.val();
+                            if (childData.longitude && childData.latitude) {
+                                var geometry = new Point(childData.longitude, childData.latitude);
+                                var pointExtetnt = new Extent(geometry.x - POINT_MARGIN, geometry.y - POINT_MARGIN, geometry.x + POINT_MARGIN, geometry.y + POINT_MARGIN);
 
-                            var geometry = new Point(childData.longitude, childData.latitude);
-                            var pointExtetnt = new Extent(geometry.x - POINT_MARGIN, geometry.y - POINT_MARGIN, geometry.x + POINT_MARGIN, geometry.y + POINT_MARGIN);
+                                extent = extent ? extent.union(pointExtetnt) : pointExtetnt;
 
-                            extent = extent ? extent.union(pointExtetnt) : pointExtetnt;
-
-                            var graphic = new Graphic(geometry);
-                            features.push(graphic);
+                                var graphic = new Graphic(geometry);
+                                features.push(graphic);
+                            }
                         });
 
                         featureLayer.applyEdits(features, null, null);
