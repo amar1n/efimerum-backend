@@ -109,23 +109,93 @@ router.get('/:id', function (req, res) {
  - photosPostedByUser: Relaciona la foto con el usuario que la creo, para que los dispositivos puedan mostrar las fotos subidas por usuario
 
  Este endpoint realiza las siguientes acciones...
- 1) Procesamos las coordenadas... si se reciben
- 2) Realizamos el SafeSearch y la detección de etiquetas
- 3) Procesamos las etiquetas... si se reciben
- 4) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
- 5) Subimos la imagen al storage
- 6) Creamos el thumbnail de la imagen
- 7) Subimos el thumbnail de la imagen al storage
- 8) Obtenemos el Firebase Dynamic Link de la foto
- 9) Generamos los nodos en la BBDD de Firebase
- 10) Persistimos en la BBDD de Firebase todos los nodos generados
- 11) Persistimos en la BBDD de Firebase la info de GeoFire
- 12) Propagar la info de Geofire a todos los nodos donde está la foto
+ 1) Procesamos las etiquetas
+ 1.a) Como se reciben... esto hará que no se consulte el API de Google Cloud Vision. Está pensado para TESTing!!!
+ 1.b) Realizamos el SafeSearch y la detección de etiquetas. Esto quiere decir que NO se han recibido labels en la petición
+ 1.b.I) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
+ 2) Procesamos las coordenadas... si se reciben
+ 3) Subimos la imagen al storage
+ 4) Creamos el thumbnail de la imagen
+ 5) Subimos el thumbnail de la imagen al storage
+ 6) Obtenemos el Firebase Dynamic Link de la foto
+ 7) Generamos los nodos en la BBDD de Firebase
+ 8) Persistimos en la BBDD de Firebase todos los nodos generados
+ 9) Persistimos en la BBDD de Firebase la info de GeoFire
+ 10) Propagar la info de Geofire a todos los nodos donde está la foto
  */
 router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     var uid = req.uid || 'batman';
+    var labelsEN = {};
+    var updates = {};
 
-    // 1) Procesamos las coordenadas... si se reciben
+    // 1) Procesamos las etiquetas
+    var bodyLabels = req.body.labels;
+    if (typeof bodyLabels !== 'undefined' && bodyLabels.trim().length > 0) {
+        // 1.a) Como se reciben... esto hará que no se consulte el API de Google Cloud Vision. Está pensado para TESTing!!!
+
+        var bodyLabelsArray = bodyLabels.split(',');
+        bodyLabelsArray.forEach(function (bodyLabel) {
+            var bodyLabelTrimed = bodyLabel.trim();
+            labelsEN[bodyLabelTrimed] = bodyLabelTrimed;
+            updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + bodyLabelTrimed] = bodyLabelTrimed;
+        });
+
+        firebaseAndGoogleCloudPlatformStuff(req, res, labelsEN, updates);
+
+    } else {
+        // 1.b) Realizamos el SafeSearch y la detección de etiquetas. Esto quiere decir que NO se han recibido labels en la petición
+
+        var photoPath = req.files[0].path;
+        var options = {
+            maxResults: 100,
+            types: ['labels', 'safeSearch'],
+            verbose: true
+        };
+        vision.detect(photoPath, options, function (err, detections, apiResponse) {
+            if (err) {
+                logError('POST photos', 'Cloud Vision Error with uid: ' + uid + ', Error: ' + err);
+                detections = {labels: [{desc: constants.googleCloudVision.defaultLabel, score: 100}]};
+            }
+
+            if (detections.safeSearch.adult == 'LIKELY' || detections.safeSearch.adult == 'VERY_LIKELY' ||
+                detections.safeSearch.spoof == 'LIKELY' || detections.safeSearch.spoof == 'VERY_LIKELY' ||
+                detections.safeSearch.medical == 'LIKELY' || detections.safeSearch.medical == 'VERY_LIKELY' ||
+                detections.safeSearch.violence == 'LIKELY' || detections.safeSearch.violence == 'VERY_LIKELY') {
+                fs.unlinkSync(photoPath);
+                logError('POST photos', 'Inappropriate content');
+                return res.status(500).json({success: false, error: 'Inappropriate content'});
+            }
+
+            var bodyLabels = req.body.labels;
+            if (typeof bodyLabels !== 'undefined' && bodyLabels.trim().length > 0) {
+                var bodyLabelsArray = bodyLabels.split(',');
+                bodyLabelsArray.forEach(function (bodyLabel) {
+                    var bodyLabelTrimed = bodyLabel.trim();
+                    labelsEN[bodyLabelTrimed] = bodyLabelTrimed;
+                    updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + bodyLabelTrimed] = bodyLabelTrimed;
+                });
+            }
+
+            // 1.b.I) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
+            detections.labels.forEach(function (label) {
+                if (label.score > constants.googleCloudVision.defaultThreshold) {
+                    labelsEN[label.desc] = label.desc;
+                    updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + label.desc] = label.desc;
+                }
+            });
+            if (Object.keys(labelsEN).length === 0) {
+                labelsEN[constants.googleCloudVision.defaultLabel] = constants.googleCloudVision.defaultLabel;
+            }
+
+            firebaseAndGoogleCloudPlatformStuff(req, res, labelsEN, updates);
+        });
+    }
+});
+
+function firebaseAndGoogleCloudPlatformStuff(req, res, labelsEN, updates) {
+    var uid = req.uid || 'batman';
+
+    // 2) Procesamos las coordenadas... si se reciben
     var bFlagCoordinates = false;
     var bodyLatitude = req.body.latitude;
     var bodyLongitude = req.body.longitude;
@@ -137,250 +207,206 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
         latitude = Number(bodyLatitude);
         longitude = Number(bodyLongitude);
     }
+
     var photoPath = req.files[0].path;
     var photoFilename = req.files[0].filename;
     const fotosBucket = storage.bucket(constants.googleCloudStorage.efimerumStorageBucket);
 
-    // 2) Realizamos el SafeSearch y la detección de etiquetas
-    var options = {
-        maxResults: 100,
-        types: ['labels', 'safeSearch'],
-        verbose: true
-    };
-    vision.detect(photoPath, options, function (err, detections, apiResponse) {
+    var labels = {};
+
+    labels[constants.firebaseNodes.languageEN] = labelsEN;
+
+    // 3) Subimos la imagen al storage
+    fotosBucket.upload(photoPath, function (err, file) {
         if (err) {
-            logError('POST photos', 'Cloud Vision Error with uid: ' + uid + ', Error: ' + err);
-            detections = {labels: [{desc: constants.googleCloudVision.defaultLabel, score: 100}]};
+            processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket,
+                photoPath, photoFilename, true, false,
+                null, null, false, false);
+            return res.status(500).json({success: false, error: err});
         }
 
-        if (detections.safeSearch.adult == 'LIKELY' || detections.safeSearch.adult == 'VERY_LIKELY' ||
-            detections.safeSearch.spoof == 'LIKELY' || detections.safeSearch.spoof == 'VERY_LIKELY' ||
-            detections.safeSearch.medical == 'LIKELY' || detections.safeSearch.medical == 'VERY_LIKELY' ||
-            detections.safeSearch.violence == 'LIKELY' || detections.safeSearch.violence == 'VERY_LIKELY') {
-            fs.unlinkSync(photoPath);
-            logError('POST photos', 'Inappropriate content');
-            return res.status(500).json({success: false, error: 'Inappropriate content'});
-        }
-
-        // 3) Procesamos las etiquetas... si se reciben
-        var labels = {};
-        var labelsEN = {};
-        var updates = {};
-
-        var bodyLabels = req.body.labels;
-        if (typeof bodyLabels !== 'undefined' && bodyLabels.trim().length > 0) {
-            var bodyLabelsArray = bodyLabels.split(',');
-            bodyLabelsArray.forEach(function (bodyLabel) {
-                var bodyLabelTrimed = bodyLabel.trim();
-                labelsEN[bodyLabelTrimed] = bodyLabelTrimed;
-                updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + bodyLabelTrimed] = bodyLabelTrimed;
-            });
-        }
-
-        // 4) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
-        detections.labels.forEach(function (label) {
-            if (label.score > constants.googleCloudVision.defaultThreshold) {
-                labelsEN[label.desc] = label.desc;
-                updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + label.desc] = label.desc;
-            }
-        });
-        if (Object.keys(labelsEN).length === 0) {
-            labelsEN[constants.googleCloudVision.defaultLabel] = constants.googleCloudVision.defaultLabel;
-        }
-
-        labels[constants.firebaseNodes.languageEN] = labelsEN;
-
-        // 5) Subimos la imagen al storage
-        fotosBucket.upload(photoPath, function (err, file) {
-            if (err) {
-                processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket,
-                    photoPath, photoFilename, true, false,
-                    null, null, false, false);
-                return res.status(500).json({success: false, error: err});
-            }
-
-            // 6) Creamos el thumbnail de la imagen
-            var options = {
-                saveToDisk: false
-            };
-            thumbnailsCreator.createThumbnail(photoPath, {
-                maxHeight: 300
-            }, options).then(function (resp) {
-                var photoSplitedByDot = photoPath.split('.');
-                var thumbnailPath = photoSplitedByDot[0] + '_thumb.' + photoSplitedByDot[photoSplitedByDot.length - 1];
-                var thumbnailSplitedBySlash = thumbnailPath.split('/');
-                var thumbnailFilename = thumbnailSplitedBySlash[thumbnailSplitedBySlash.length - 1];
-                resp.thumbnail.image.writeFile(thumbnailPath, function (err) {
+        // 4) Creamos el thumbnail de la imagen
+        var options = {
+            saveToDisk: false
+        };
+        thumbnailsCreator.createThumbnail(photoPath, {
+            maxHeight: 300
+        }, options).then(function (resp) {
+            var photoSplitedByDot = photoPath.split('.');
+            var thumbnailPath = photoSplitedByDot[0] + '_thumb.' + photoSplitedByDot[photoSplitedByDot.length - 1];
+            var thumbnailSplitedBySlash = thumbnailPath.split('/');
+            var thumbnailFilename = thumbnailSplitedBySlash[thumbnailSplitedBySlash.length - 1];
+            resp.thumbnail.image.writeFile(thumbnailPath, function (err) {
+                if (err) {
+                    processErrorInPostPhoto(err, 'Error writeFile Thumbnail', fotosBucket,
+                        photoPath, photoFilename, true, true,
+                        thumbnailPath, null, true, false);
+                    return res.status(500).json({success: false, error: err});
+                }
+                // 5) Subimos el thumbnail de la imagen al storage
+                fotosBucket.upload(thumbnailPath, function (err, file) {
                     if (err) {
-                        processErrorInPostPhoto(err, 'Error writeFile Thumbnail', fotosBucket,
+                        processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
                             photoPath, photoFilename, true, true,
                             thumbnailPath, null, true, false);
                         return res.status(500).json({success: false, error: err});
                     }
-                    // 7) Subimos el thumbnail de la imagen al storage
-                    fotosBucket.upload(thumbnailPath, function (err, file) {
+
+                    // 6) Obtenemos el Firebase Dynamic Link de la foto
+                    var photoKey = rootRef.child(constants.firebaseNodes.photos).push().key;
+                    var json = {
+                        "longDynamicLink": constants.firebaseDynamicLinks.firebaseDynamicLinkDomain + "?link=" + constants.firebaseDynamicLinks.efimerumPhotosUrl + '/' + photoKey +
+                        "&apn=" + constants.firebaseDynamicLinks.efimerum_AndroidPackageName + "&afl=" + constants.firebaseDynamicLinks.efimerumUrl +
+                        "&ibi=" + constants.firebaseDynamicLinks.efimerum_iosBundleId + "&isi=" + constants.firebaseDynamicLinks.efimerum_iosAppStoreId + "&ifl=" + constants.firebaseDynamicLinks.efimerumUrl,
+                        "suffix": {
+                            "option": "UNGUESSABLE"
+                        }
+                    };
+                    var options = {
+                        url: constants.firebaseDynamicLinks.firebaseDynamiclinksApiUrl + constants.firebaseDynamicLinks.firebaseWebApiKey,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        json: json
+                    };
+                    request(options, function (err, result, body) {
                         if (err) {
-                            processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
+                            processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
                                 photoPath, photoFilename, true, true,
-                                thumbnailPath, null, true, false);
+                                thumbnailPath, thumbnailFilename, true, true);
                             return res.status(500).json({success: false, error: err});
                         }
-
-                        // 8) Obtenemos el Firebase Dynamic Link de la foto
-                        var photoKey = rootRef.child(constants.firebaseNodes.photos).push().key;
-                        var json = {
-                            "longDynamicLink": constants.firebaseDynamicLinks.firebaseDynamicLinkDomain + "?link=" + constants.firebaseDynamicLinks.efimerumPhotosUrl + '/' + photoKey +
-                            "&apn=" + constants.firebaseDynamicLinks.efimerum_AndroidPackageName + "&afl=" + constants.firebaseDynamicLinks.efimerumUrl +
-                            "&ibi=" + constants.firebaseDynamicLinks.efimerum_iosBundleId + "&isi=" + constants.firebaseDynamicLinks.efimerum_iosAppStoreId + "&ifl=" + constants.firebaseDynamicLinks.efimerumUrl,
-                            "suffix": {
-                                "option": "UNGUESSABLE"
-                            }
-                        };
-                        var options = {
-                            url: constants.firebaseDynamicLinks.firebaseDynamiclinksApiUrl + constants.firebaseDynamicLinks.firebaseWebApiKey,
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            json: json
-                        };
-                        request(options, function (err, result, body) {
-                            if (err) {
-                                processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
-                                    photoPath, photoFilename, true, true,
-                                    thumbnailPath, thumbnailFilename, true, true);
-                                return res.status(500).json({success: false, error: err});
-                            }
-                            if (!(result && (result.statusCode === 200 || result.statusCode === 201))) {
-                                processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
-                                    photoPath, photoFilename, true, true,
-                                    thumbnailPath, thumbnailFilename, true, true);
-                                return res.status(500).json({
-                                    success: false,
-                                    error: 'Error generating Firebase Dynamic Link'
-                                });
-                            }
-
-                            // 9) Generamos los nodos en la BBDD de Firebase
-                            var imageData = {};
-                            imageData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + photoFilename;
-                            var dimensions = sizeOf(photoPath);
-                            imageData['width'] = dimensions.width;
-                            imageData['height'] = dimensions.height;
-                            imageData['fileName'] = photoFilename;
-                            var thumbnailData = {};
-                            thumbnailData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
-                            var dimensionsThumbnail = sizeOf(thumbnailPath);
-                            thumbnailData['width'] = dimensionsThumbnail.width;
-                            thumbnailData['height'] = dimensionsThumbnail.height;
-                            thumbnailData['fileName'] = thumbnailFilename;
-
-                            var now = moment();
-                            var photoData = {
-                                creationDate: now.unix(),
-                                expirationDate: now.add(1, 'hours').unix(),
-                                labels: labels,
-                                imageData: imageData,
-                                thumbnailData: thumbnailData,
-                                numOfLikes: 0,
-                                owner: uid,
-                                md5: md5(photoFilename),
-                                sha1: sha1(photoFilename),
-                                sha256: sha256(photoFilename),
-                                randomString: randomstring.generate(),
-                                dynamicLink: body.shortLink
-                            };
-
-                            if (bFlagCoordinates) {
-                                photoData.latitude = latitude;
-                                photoData.longitude = longitude;
-                            }
-
-                            updates[constants.firebaseNodes.photos + '/' + photoKey] = photoData;
-                            Object.keys(labelsEN).forEach(function (label) {
-                                updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey] = photoData;
+                        if (!(result && (result.statusCode === 200 || result.statusCode === 201))) {
+                            processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
+                                photoPath, photoFilename, true, true,
+                                thumbnailPath, thumbnailFilename, true, true);
+                            return res.status(500).json({
+                                success: false,
+                                error: 'Error generating Firebase Dynamic Link'
                             });
-                            updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
-                            updates[constants.firebaseNodes._photos + '/' + photoKey] = photoData;
+                        }
 
-                            // 10) Persistimos en la BBDD de Firebase todos los nodos generados
-                            rootRef.update(updates)
-                                .then(function () {
-                                    fs.unlink(photoPath, function (err) {
-                                        if (err) {
-                                            return logError('POST photos', '.............unlink photoPath: ' + photoPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
-                                        }
-                                    });
-                                    fs.unlink(thumbnailPath, function (err) {
-                                        if (err) {
-                                            return logError('POST photos', '.............unlink thumbnailPath: ' + thumbnailPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
-                                        }
-                                    });
+                        // 7) Generamos los nodos en la BBDD de Firebase
+                        var imageData = {};
+                        imageData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + photoFilename;
+                        var dimensions = sizeOf(photoPath);
+                        imageData['width'] = dimensions.width;
+                        imageData['height'] = dimensions.height;
+                        imageData['fileName'] = photoFilename;
+                        var thumbnailData = {};
+                        thumbnailData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
+                        var dimensionsThumbnail = sizeOf(thumbnailPath);
+                        thumbnailData['width'] = dimensionsThumbnail.width;
+                        thumbnailData['height'] = dimensionsThumbnail.height;
+                        thumbnailData['fileName'] = thumbnailFilename;
 
-                                    // 11) Persistimos en la BBDD de Firebase la info de GeoFire
-                                    if (bFlagCoordinates) {
-                                        geoFire.set(photoKey, [latitude, longitude]).then(function () {
+                        var now = moment();
+                        var photoData = {
+                            creationDate: now.unix(),
+                            expirationDate: now.add(1, 'hours').unix(),
+                            labels: labels,
+                            imageData: imageData,
+                            thumbnailData: thumbnailData,
+                            numOfLikes: 0,
+                            owner: uid,
+                            md5: md5(photoFilename),
+                            sha1: sha1(photoFilename),
+                            sha256: sha256(photoFilename),
+                            randomString: randomstring.generate(),
+                            dynamicLink: body.shortLink
+                        };
 
-                                            // 12) Propagar la info de Geofire a todos los nodos donde está la foto
-                                            var photoGeoRef = rootRef.child(constants.firebaseNodes.geoFirePhotos + '/' + photoKey);
-                                            photoGeoRef.once('value')
-                                                .then(function (snap) {
-                                                    var photoGeo = snap.val();
-                                                    updates = {};
-                                                    var keys = Object.keys(photoGeo);
-                                                    keys.forEach(function (entry) {
-                                                        updates[constants.firebaseNodes.photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                        Object.keys(labelsEN).forEach(function (label) {
-                                                            updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                        });
-                                                        updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                        updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
-                                                    });
-                                                    rootRef.update(updates)
-                                                        .then(function () {
-                                                            return res.status(200).json({
-                                                                success: true,
-                                                                data: photoKey
-                                                            });
-                                                        })
-                                                        .catch(function (error) {
-                                                            logError('POST photos', '.............GeoFire propagation-update Error: ' + error + '....with photoKey: ' + photoKey);
-                                                            return res.status(500).json({success: false, error: error});
-                                                        });
-                                                })
-                                                .catch(function (error) {
-                                                    logError('POST photos', '.............GeoFire propagation Error: ' + error + '....with photoKey: ' + photoKey);
-                                                });
-                                        }).catch(function (error) {
-                                            logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
-                                            return res.status(500).json({
-                                                success: false,
-                                                error: 'Photo added without GeoFire info!'
-                                            });
-                                        });
-                                    } else {
-                                        return res.status(200).json({success: true, data: photoKey});
+                        if (bFlagCoordinates) {
+                            photoData.latitude = latitude;
+                            photoData.longitude = longitude;
+                        }
+
+                        updates[constants.firebaseNodes.photos + '/' + photoKey] = photoData;
+                        Object.keys(labelsEN).forEach(function (label) {
+                            updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey] = photoData;
+                        });
+                        updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
+                        updates[constants.firebaseNodes._photos + '/' + photoKey] = photoData;
+
+                        // 8) Persistimos en la BBDD de Firebase todos los nodos generados
+                        rootRef.update(updates)
+                            .then(function () {
+                                fs.unlink(photoPath, function (err) {
+                                    if (err) {
+                                        return logError('POST photos', '.............unlink photoPath: ' + photoPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
                                     }
-                                })
-                                .catch(function (error) {
-                                    processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
-                                        photoPath, photoFilename, true, true,
-                                        thumbnailPath, thumbnailFilename, true, true);
-                                    return res.status(500).json({success: false, error: error});
+                                });
+                                fs.unlink(thumbnailPath, function (err) {
+                                    if (err) {
+                                        return logError('POST photos', '.............unlink thumbnailPath: ' + thumbnailPath + ', Error: ' + error + '....with photoKey: ' + photoKey);
+                                    }
                                 });
 
-                        });
+                                // 9) Persistimos en la BBDD de Firebase la info de GeoFire
+                                if (bFlagCoordinates) {
+                                    geoFire.set(photoKey, [latitude, longitude]).then(function () {
+
+                                        // 10) Propagar la info de Geofire a todos los nodos donde está la foto
+                                        var photoGeoRef = rootRef.child(constants.firebaseNodes.geoFirePhotos + '/' + photoKey);
+                                        photoGeoRef.once('value')
+                                            .then(function (snap) {
+                                                var photoGeo = snap.val();
+                                                updates = {};
+                                                var keys = Object.keys(photoGeo);
+                                                keys.forEach(function (entry) {
+                                                    updates[constants.firebaseNodes.photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    Object.keys(labelsEN).forEach(function (label) {
+                                                        updates[constants.firebaseNodes.photosByLabel + '/' + constants.firebaseNodes.languageEN + '/' + label + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    });
+                                                    updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                    updates[constants.firebaseNodes._photos + '/' + photoKey + '/' + entry] = photoGeo[entry];
+                                                });
+                                                rootRef.update(updates)
+                                                    .then(function () {
+                                                        return res.status(200).json({
+                                                            success: true,
+                                                            data: photoKey
+                                                        });
+                                                    })
+                                                    .catch(function (error) {
+                                                        logError('POST photos', '.............GeoFire propagation-update Error: ' + error + '....with photoKey: ' + photoKey);
+                                                        return res.status(500).json({success: false, error: error});
+                                                    });
+                                            })
+                                            .catch(function (error) {
+                                                logError('POST photos', '.............GeoFire propagation Error: ' + error + '....with photoKey: ' + photoKey);
+                                            });
+                                    }).catch(function (error) {
+                                        logError('POST photos', '.............GeoFire Error: ' + error + '....with photoKey: ' + photoKey);
+                                        return res.status(500).json({
+                                            success: false,
+                                            error: 'Photo added without GeoFire info!'
+                                        });
+                                    });
+                                } else {
+                                    return res.status(200).json({success: true, data: photoKey});
+                                }
+                            })
+                            .catch(function (error) {
+                                processErrorInPostPhoto(error, 'Error updating in Firebase', fotosBucket,
+                                    photoPath, photoFilename, true, true,
+                                    thumbnailPath, thumbnailFilename, true, true);
+                                return res.status(500).json({success: false, error: error});
+                            });
+
                     });
                 });
-            }, function (err) {
-                processErrorInPostPhoto(err, 'Error when create thumbnail!', fotosBucket,
-                    photoPath, photoFilename, true, true,
-                    null, null, false, false);
-                return res.status(500).json({success: false, error: 'Error when create thumbnail!'});
             });
+        }, function (err) {
+            processErrorInPostPhoto(err, 'Error when create thumbnail!', fotosBucket,
+                photoPath, photoFilename, true, true,
+                null, null, false, false);
+            return res.status(500).json({success: false, error: 'Error when create thumbnail!'});
         });
     });
-});
+
+}
 
 // --------------------------------------
 // --------------------------------------
