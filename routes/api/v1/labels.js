@@ -86,7 +86,7 @@ router.post('/', firebaseAuth(), function (req, res) {
     // 1.b) Validamos el idioma solicitado
     var lang = req.query.lang;
     var validLanguages = [constants.firebaseNodes.languageEN];
-    if (typeof lang !== 'undefined') {
+    if (typeof lang !== 'undefined' && lang.trim().length > 0) {
         if (validLanguages.indexOf(lang) === -1) {
             return res.status(400).json({success: false, error: 'Wrong API call (language)'});
         }
@@ -98,7 +98,7 @@ router.post('/', firebaseAuth(), function (req, res) {
     // 2) Leemos las etiquetas de la BBDD de Firebase
     labelsRef.once('value')
         .then(function (snap) {
-            if (typeof lang !== 'undefined') {
+            if (typeof lang !== 'undefined' && lang.trim().length > 0) {
                 var result = {};
                 result[lang] = snap.val();
                 return res.status(200).json({success: true, data: result});

@@ -73,6 +73,7 @@ router.get('/:id', function (req, res) {
  * @apiParam {String} idToken User's ID token
  * @apiParam {Number} [latitude] The latitude of the user performing the action
  * @apiParam {Number} [longitude] The latitude of the user performing the action
+ * @apiParam {String} [labels] Photo's labels separated by comma (',')
  * @apiParam {String} [uid] Used by bash tasks. User's ID. Use in conjunction with 'test'
  * @apiParam {String} [test] Used by bash tasks. Flag to bypass the authentication. Use in conjunction with 'uid'
  * @apiExample Example of use:
@@ -82,7 +83,8 @@ router.get('/:id', function (req, res) {
  *     {
  *       "idToken": "XXyXX",
  *       "latitude": 41.375395,
- *       "longitude": 2.170624
+ *       "longitude": 2.170624,
+ *       "labels": "Line art, Beach, Vampires"
  *     }
  *
  * @apiSuccessExample
@@ -109,15 +111,16 @@ router.get('/:id', function (req, res) {
  Este endpoint realiza las siguientes acciones...
  1) Procesamos las coordenadas... si se reciben
  2) Realizamos el SafeSearch y la detección de etiquetas
- 3) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
- 4) Subimos la imagen al storage
- 5) Creamos el thumbnail de la imagen
- 6) Subimos el thumbnail de la imagen al storage
- 7) Obtenemos el Firebase Dynamic Link de la foto
- 8) Generamos los nodos en la BBDD de Firebase
- 9) Persistimos en la BBDD de Firebase todos los nodos generados
- 10) Persistimos en la BBDD de Firebase la info de GeoFire
- 11) Propagar la info de Geofire a todos los nodos donde está la foto
+ 3) Procesamos las etiquetas... si se reciben
+ 4) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
+ 5) Subimos la imagen al storage
+ 6) Creamos el thumbnail de la imagen
+ 7) Subimos el thumbnail de la imagen al storage
+ 8) Obtenemos el Firebase Dynamic Link de la foto
+ 9) Generamos los nodos en la BBDD de Firebase
+ 10) Persistimos en la BBDD de Firebase todos los nodos generados
+ 11) Persistimos en la BBDD de Firebase la info de GeoFire
+ 12) Propagar la info de Geofire a todos los nodos donde está la foto
  */
 router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     var uid = req.uid || 'batman';
@@ -128,7 +131,8 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
     var bodyLongitude = req.body.longitude;
     var latitude = 0;
     var longitude = 0;
-    if (typeof bodyLatitude !== 'undefined' && typeof bodyLongitude !== 'undefined') {
+    if (typeof bodyLatitude !== 'undefined' && bodyLatitude.trim().length > 0 &&
+        typeof bodyLongitude !== 'undefined' && bodyLongitude.trim().length > 0) {
         bFlagCoordinates = true;
         latitude = Number(bodyLatitude);
         longitude = Number(bodyLongitude);
@@ -158,10 +162,22 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
             return res.status(500).json({success: false, error: 'Inappropriate content'});
         }
 
-        // 3) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
+        // 3) Procesamos las etiquetas... si se reciben
         var labels = {};
         var labelsEN = {};
         var updates = {};
+
+        var bodyLabels = req.body.labels;
+        if (typeof bodyLabels !== 'undefined' && bodyLabels.trim().length > 0) {
+            var bodyLabelsArray = bodyLabels.split(',');
+            bodyLabelsArray.forEach(function (bodyLabel) {
+                var bodyLabelTrimed = bodyLabel.trim();
+                labelsEN[bodyLabelTrimed] = bodyLabelTrimed;
+                updates[constants.firebaseNodes.labels + '/' + constants.firebaseNodes.languageEN + '/' + bodyLabelTrimed] = bodyLabelTrimed;
+            });
+        }
+
+        // 4) Nos quedamos con las etiquetas que superen un umbral de 75 puntos (aquí iría la traducción de labels)
         detections.labels.forEach(function (label) {
             if (label.score > constants.googleCloudVision.defaultThreshold) {
                 labelsEN[label.desc] = label.desc;
@@ -174,7 +190,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
 
         labels[constants.firebaseNodes.languageEN] = labelsEN;
 
-        // 4) Subimos la imagen al storage
+        // 5) Subimos la imagen al storage
         fotosBucket.upload(photoPath, function (err, file) {
             if (err) {
                 processErrorInPostPhoto(err, 'Error storing the image in Google Cloud Storage', fotosBucket,
@@ -183,7 +199,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                 return res.status(500).json({success: false, error: err});
             }
 
-            // 5) Creamos el thumbnail de la imagen
+            // 6) Creamos el thumbnail de la imagen
             var options = {
                 saveToDisk: false
             };
@@ -201,7 +217,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             thumbnailPath, null, true, false);
                         return res.status(500).json({success: false, error: err});
                     }
-                    // 6) Subimos el thumbnail de la imagen al storage
+                    // 7) Subimos el thumbnail de la imagen al storage
                     fotosBucket.upload(thumbnailPath, function (err, file) {
                         if (err) {
                             processErrorInPostPhoto(err, 'Error storing the thumbnail in Google Cloud Storage', fotosBucket,
@@ -210,7 +226,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             return res.status(500).json({success: false, error: err});
                         }
 
-                        // 7) Obtenemos el Firebase Dynamic Link de la foto
+                        // 8) Obtenemos el Firebase Dynamic Link de la foto
                         var photoKey = rootRef.child(constants.firebaseNodes.photos).push().key;
                         var json = {
                             "longDynamicLink": constants.firebaseDynamicLinks.firebaseDynamicLinkDomain + "?link=" + constants.firebaseDynamicLinks.efimerumPhotosUrl + '/' + photoKey +
@@ -239,10 +255,13 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                                 processErrorInPostPhoto(err, 'Error generating Firebase Dynamic Link', fotosBucket,
                                     photoPath, photoFilename, true, true,
                                     thumbnailPath, thumbnailFilename, true, true);
-                                return res.status(500).json({success: false, error: 'Error generating Firebase Dynamic Link'});
+                                return res.status(500).json({
+                                    success: false,
+                                    error: 'Error generating Firebase Dynamic Link'
+                                });
                             }
 
-                            // 8) Generamos los nodos en la BBDD de Firebase
+                            // 9) Generamos los nodos en la BBDD de Firebase
                             var imageData = {};
                             imageData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + photoFilename;
                             var dimensions = sizeOf(photoPath);
@@ -284,7 +303,7 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                             updates[constants.firebaseNodes.photosPostedByUser + '/' + uid + '/' + photoKey] = photoData;
                             updates[constants.firebaseNodes._photos + '/' + photoKey] = photoData;
 
-                            // 9) Persistimos en la BBDD de Firebase todos los nodos generados
+                            // 10) Persistimos en la BBDD de Firebase todos los nodos generados
                             rootRef.update(updates)
                                 .then(function () {
                                     fs.unlink(photoPath, function (err) {
@@ -298,11 +317,11 @@ router.post('/', multer.any(), firebaseAuth(), function (req, res) {
                                         }
                                     });
 
-                                    // 10) Persistimos en la BBDD de Firebase la info de GeoFire
+                                    // 11) Persistimos en la BBDD de Firebase la info de GeoFire
                                     if (bFlagCoordinates) {
                                         geoFire.set(photoKey, [latitude, longitude]).then(function () {
 
-                                            // 11) Propagar la info de Geofire a todos los nodos donde está la foto
+                                            // 12) Propagar la info de Geofire a todos los nodos donde está la foto
                                             var photoGeoRef = rootRef.child(constants.firebaseNodes.geoFirePhotos + '/' + photoKey);
                                             photoGeoRef.once('value')
                                                 .then(function (snap) {

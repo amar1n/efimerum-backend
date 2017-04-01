@@ -67,7 +67,7 @@ router.post('/', firebaseAuth(), function (req, res) {
     // 1) Validamos el idioma indicado
     var lang = req.body.lang;
     var validLanguages = [constants.firebaseNodes.languageEN];
-    if (typeof lang !== 'undefined') {
+    if (typeof lang !== 'undefined' && lang.trim().length > 0) {
         if (validLanguages.indexOf(lang) === -1) {
             logError('POST favoriteLabel', 'Wrong API call (wrong language)');
             return res.status(400).json({success: false, error: 'Wrong API call (wrong language)'});
@@ -155,7 +155,7 @@ router.delete('/', firebaseAuth(), function (req, res) {
     // 1) Validamos el idioma indicado
     var lang = req.query.lang;
     var validLanguages = [constants.firebaseNodes.languageEN];
-    if (typeof lang !== 'undefined') {
+    if (typeof lang !== 'undefined' && lang.trim().length > 0) {
         if (validLanguages.indexOf(lang) === -1) {
             logError('DELETE favoriteLabel', 'Wrong API call (wrong language)');
             return res.status(400).json({success: false, error: 'Wrong API call (wrong language)'});
