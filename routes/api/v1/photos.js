@@ -317,7 +317,7 @@ function firebaseAndGoogleCloudPlatformStuff(req, res, labelsEN, updates) {
                         var now = moment();
                         var photoData = {
                             creationDate: now.unix(),
-                            expirationDate: now.add(1, 'hours').unix(),
+                            expirationDate: now.add(4, 'hours').unix(),
                             labels: labels,
                             imageData: imageData,
                             thumbnailData: thumbnailData,
