@@ -290,13 +290,26 @@ function firebaseAndGoogleCloudPlatformStuff(req, res, labelsEN, updates) {
                         // 7) Generamos los nodos en la BBDD de Firebase
                         var imageData = {};
                         imageData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + photoFilename;
-                        var dimensions = sizeOf(photoPath);
+                        var dimensions = {};
+                        var dimensionsThumbnail = {};
+                        try {
+                            dimensions = sizeOf(photoPath);
+                            dimensionsThumbnail = sizeOf(thumbnailPath);
+                        } catch (err) {
+                            processErrorInPostPhoto(err, 'Error getting the dimensions of the image and thumbnail', fotosBucket,
+                                photoPath, photoFilename, true, true,
+                                thumbnailPath, thumbnailFilename, true, true);
+                            return res.status(500).json({
+                                success: false,
+                                error: 'Error getting the dimensions of the image and thumbnail'
+                            });
+                        }
+
                         imageData['width'] = dimensions.width;
                         imageData['height'] = dimensions.height;
                         imageData['fileName'] = photoFilename;
                         var thumbnailData = {};
                         thumbnailData['url'] = constants.googleCloudStorage.efimerumStorageBucketPublicURL + '/' + thumbnailFilename;
-                        var dimensionsThumbnail = sizeOf(thumbnailPath);
                         thumbnailData['width'] = dimensionsThumbnail.width;
                         thumbnailData['height'] = dimensionsThumbnail.height;
                         thumbnailData['fileName'] = thumbnailFilename;
