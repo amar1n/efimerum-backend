@@ -197,8 +197,8 @@ function firebaseAndGoogleCloudPlatformStuff(req, res, labelsEN, updates) {
 
     // 2) Procesamos las coordenadas... si se reciben
     var bFlagCoordinates = false;
-    var bodyLatitude = req.body.latitude;
-    var bodyLongitude = req.body.longitude;
+    var bodyLatitude = '' + req.body.latitude;
+    var bodyLongitude = '' + req.body.longitude;
     var latitude = 0;
     var longitude = 0;
     if (typeof bodyLatitude !== 'undefined' && bodyLatitude.trim().length > 0 &&
