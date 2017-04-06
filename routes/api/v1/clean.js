@@ -38,7 +38,7 @@ var pp = require('./../../../lib/utils').processPhotos;
 router.get('/', firebaseAuth(), function (req, res) {
     pp();
     return res.status(200).json({success: true, data: 'Proceso de limieza lanzado!!!'});
-    // var interval = setInterval(pp, 60000);
+    var interval = setInterval(pp, 60000);
 });
 
 // --------------------------------------

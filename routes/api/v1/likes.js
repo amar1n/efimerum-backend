@@ -125,7 +125,7 @@ router.post('/', firebaseAuth(), function (req, res) {
             photoRef.transaction(function (currentData) {
                 if (currentData != null) {
                     currentData.numOfLikes = currentData.numOfLikes + 1;
-                    currentData.expirationDate = moment.unix(currentData.expirationDate).add(1, 'hours').unix();
+                    currentData.expirationDate = moment.unix(currentData.expirationDate).add(10, 'minutes').unix();
                     return currentData;
                 } else {
                     return 0;
