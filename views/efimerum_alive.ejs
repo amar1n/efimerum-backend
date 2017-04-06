@@ -3,31 +3,46 @@
 <head>
     <title><%= title %></title>
     <style>
+
         html, body {
+            width: 100%;
             height: 100%;
-            margin: 0;
             padding: 0;
+            margin: 0;
         }
 
         div {
-            position: relative;
-            height: 100%;
+            padding: 0;
+            margin: 0;
             width: 100%;
+            height: 100%;
+            float: left;
         }
 
-        div img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            margin: auto;
+        #rect1, #rect1 p img {
+            display: inline-block;
+            text-align: center;
         }
+
+        #rect1 p {
+            margin: 0;
+            padding: 0;
+            position: relative;
+            top: 35%;
+            transform: translateY(-10%);
+        }
+
+        br {
+            clear: left;
+        }
+
     </style>
+    <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
 </head>
 <body style="background-color:#02cc0b;">
-<div>
-    <img src="flame.png" alt="Efimerum"/>
+<div id="rect1">
+    <p><a href="https://efimerum-48618.firebaseapp.com"><img src="flame.png"/></a></p>
+    <p style="color: white;font-family: Roboto;font-size:300%;">Efimerum</p>
 </div>
 </body>
 </html>
